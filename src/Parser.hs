@@ -44,6 +44,7 @@ data Expr = Constant Integer
             | Paren Expr
             | Min Expr Expr
             | Print Expr
+            | Ass String Expr
             deriving (Eq,Show)
 
 data Condition = Lt Expr Expr
@@ -66,7 +67,7 @@ languageDef =
                                       , "bool"
                                       , "?"
                                       ]
-            , Token.reservedOpNames = [ "+", "*", "-", "<", ">", "=="
+            , Token.reservedOpNames = [ "+", "*", "-", "<", ">", "==", "="
                                       ]
             }
 lexer = Token.makeTokenParser languageDef
@@ -95,6 +96,9 @@ reservedOp = Token.reservedOp lexer
 whitespace :: Parser ()
 whitespace = Token.whiteSpace lexer
 
+lexeme :: Parser a -> Parser a
+lexeme = Token.lexeme lexer
+
 comma :: Parser String
 comma = Token.comma lexer
 
@@ -107,21 +111,7 @@ parseCondition = try ((Eq <$> parseExpr) <*> (symbol "==" *> parseExpr))
               <|> ((Gt <$> parseExpr) <*> (symbol ">" *> parseExpr))
 parseCondition_test1 = parse parseCondition "" "2 == fib(2)"
 parseCondition_test2 = parse parseCondition "" "2 < fib(2)"
-parseCondition_test3 = parse parseCondition "" "2 > fib(2)"
-
-parseIf :: Parser Expr
-parseIf = If <$> (reserved "?" *> parseCondition)
-          <*> braces parseExpr
-          <*> braces parseExpr
-parseIf_tesst1 = parse parseIf "" "?(2==2){2+1}{2}"
-
--- parseExpr :: Parser Expr
--- parseExpr =
-
--- parseExpr :: Parser Expr
--- parseExpr = parseTerm `chainr1` addition
---             <|> parseDec
---             <|> parseIf
+parseCondition_test3 = parse parseCondition "" "2 > fib(2,2)"
 
 
 addition :: Parser (Expr -> Expr -> Expr)
@@ -164,14 +154,31 @@ parseTerm_test2 = parse parseTerm "" "2*4*4"
 
 parameters :: Parser [Expr]
 parameters = commaSep parseExpr
-parameters_test1 = parse parameters "" "x,2"
+parameters_test1 = parse parameters "" "2,x"
+
+parseAss:: Parser Expr
+parseAss = try (Ass<$>identifier<*>(reservedOp "=" *> parseExpr))
+parseAss_test1 = parse parseAss "" "x = 2"
+parseAss_test2 = parse parseAss "" "x = fib(2)"
+
+parseIf :: Parser Expr
+parseIf = If <$> (reserved "?" *> parens parseCondition)
+          <*> braces  parseExpr
+          <*> braces parseExpr
+parseIf_tesst1 = parse parseIf "" "?(2==2){2+1}{2}"
+parseIf_tesst2 = parse parseIf "" "?(2==2){2}{x = 2}"
 
 parseFactor :: Parser Expr
-parseFactor = (Constant <$> integer)
-      <|> parseIf
-      <|> (Funct <$> identifier<*> parens parameters) --sepBy parseExpr comma )) -- Should be cool to use: commaSep
-      <|> (Paren <$> parens parseExpr)
-      <|> (Identifier <$> identifier)
+parseFactor = try (Constant <$> integer)
+      <|> try parseIf
+      <|> try (Funct <$> identifier<*> parens parameters) --sepBy parseExpr comma )) -- Should be cool to use: commaSep
+      <|> try (Paren <$> parens parseExpr)
+      <|> try (Identifier <$> identifier)
+      <|> try parseAss
+
+parsefactor_testCosnt = parse parseFactor "" "2"
+parsefactor_testIdent = parse parseFactor "" "x"
+parsefactor_testIf = parse parseFactor "" "?(2<x){x=2}{x=3}"
 
 -----------------------Parse Commands-----------------------------------
 parseArgType:: Parser ArgType
@@ -181,8 +188,9 @@ parseArgType_testBol = parse parseArgType "" "bool x"
 parseArgType_testInt = parse parseArgType "" "int x"
 
 parseVarDecl:: Parser Commands
-parseVarDecl = VarDecl <$> parseArgType <*> parseExpr
+parseVarDecl = VarDecl <$> parseArgType <*>(reservedOp "=" *> parseExpr)
 parseVarDecl_test1 = parse parseVarDecl "" "int x = 2"
+parseVarDecl_test2 = parse parseVarDecl "" "int x = fib(2)"
 
 
 
