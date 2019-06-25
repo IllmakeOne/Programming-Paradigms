@@ -26,4 +26,4 @@ prog = [ ReadInstr numberIO            -- ask the user for a number
        ]
 
 -- run the prog on 1 Sprockell core
-main = run [prog]
+cheese = run [prog]

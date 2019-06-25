@@ -1,4 +1,4 @@
-resolver: lts-9.21
+resolver: lts-9.21 # The version we used in PP is 8.0.2
 
 # User packages to be built.
 # Various formats can be used as shown in the example below.

@@ -1,4 +1,4 @@
-name:                CS8-AMV-project
+name:                PP-AMV-Lang
 version:             0.1.0.0
 license:             BSD3
 author:              "Robert Banu & Jesse van der Velden"
@@ -26,7 +26,7 @@ library:
   source-dirs: src
 
 executables:
-  project-exe:
+  amv:
     main:                Main.hs
     source-dirs:         app
     ghc-options:
@@ -34,10 +34,10 @@ executables:
     - -rtsopts
     - -with-rtsopts=-N
     dependencies:
-    - CS8-AMV-project
+    - PP-AMV-Lang
 
 tests:
-  project-test:
+  amv-test:
     main:                Spec.hs
     source-dirs:         test
     ghc-options:
@@ -45,4 +45,4 @@ tests:
     - -rtsopts
     - -with-rtsopts=-N
     dependencies:
-    - CS8-AMV-project
+    - PP-AMV-Lang
