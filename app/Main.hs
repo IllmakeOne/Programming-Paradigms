@@ -1,6 +1,7 @@
 module Main where
 
 import Lib
+import Generator
 
 main :: IO ()
-main = someFunc
+main = cheese

@@ -1,4 +1,4 @@
-# CS8 - Project - Almost Vaction (AMV) language
+# Project Paradigms (Module 8) Project - Almost Vaction (AMV) language
 The AMV language is implemented in Haskell. Therefore you need to have
 [Stack](https://haskellstack.org/) installed.
 
@@ -6,9 +6,12 @@ The AMV language is implemented in Haskell. Therefore you need to have
 * Clone this project/ unzip it, and run the following commands in your
   preferred command line/ terminal:
 * `stack build`
+It will try to download leonschoorl/sprockell from Github and Parsec from
+hackage.
 
 ## Get a working compiler
-* `stack exec project-exe`
+* `stack exec amv`
+* `stack exec amv blablafilename.amv`
 
 ## Test
 * `stack test`
