@@ -18,15 +18,17 @@ parser p xs | isLeft res = error $ show $ fromLeft' res
   where res = parse p "" xs
 ---------------------------------------------
 
-data Commands = VarDecl String Expr
-              | FunDecl String [(ArgType,String)] Expr
+data Commands = VarDecl ArgType Expr
+              | FunDecl String [ArgType] Expr
               | Fork Expr
               | Join
               | CommandPrint Expr
               -- | Bol String Expr
               -- | Int String Expr
+              deriving Show
 
-data ArgType = Bol | Int
+data ArgType = Bol String | Int String
+      deriving Show
 
 -- data Declaration =
 
@@ -133,24 +135,36 @@ multiply = const Mult <$> reservedOp "*"
 
 
 parseExpr:: Parser Expr
-parseExpr = try( (parseTerm `chainr1` addition)
-      <|> try ((parseTerm `chainl1` subtraction)
-      <|> (parseTerm)))
+parseExpr =
+      try (Add <$> parseTerm<*>(reservedOp "+"*>parseExpr))
+      <|> try ( Min <$> parseTerm<*>(reservedOp "-"*>parseExpr))
+      --  (parseTerm `chainl1` addition)
+      -- <|>  (parseTerm `chainl1` subtraction)
+      <|> try (parseTerm)
+
+      -- parseExpr = try (Add <$> parseTerm<*>reservedOp "+"<*>parseTerm)
+      --       <|> try ((parseTerm `chainl1` subtraction)
+      --       <|> (parseTerm))
 parseExpr_test1 = parse parseExpr "" "3+3*2"
 parseExpr_test2 = parse parseExpr "" "fib(2) + 32"
-parseExpr_test3 = parse parseExpr "" "2 - 32"
+parseExpr_test3 = parse parseExpr "" "2 - 32 +2"
 
 
 -- Term parser
 parseTerm :: Parser Expr
-parseTerm = try (parseFactor `chainr1` multiply)
-    <|> (parseFactor)
+parseTerm =
+    try (Mult <$> parseFactor<*>(reservedOp "*" *>parseTerm))
+    -- try (parseFactor `chainl1` multiply)
+    <|> try (parseFactor)
+parseTerm_test1 = parse parseTerm "" "2*4"
+parseTerm_test2 = parse parseTerm "" "2*4*4"
 
 -- pareseFunctionDeclaration =
 --   (Funct <$> identifier<*>(parens$ sep1 expr (char ',') ))
 
 parameters :: Parser [Expr]
 parameters = commaSep parseExpr
+parameters_test1 = parse parameters "" "x,2"
 
 parseFactor :: Parser Expr
 parseFactor = (Constant <$> integer)
@@ -159,11 +173,21 @@ parseFactor = (Constant <$> integer)
       <|> (Paren <$> parens parseExpr)
       <|> (Identifier <$> identifier)
 
+-----------------------Parse Commands-----------------------------------
+parseArgType:: Parser ArgType
+parseArgType = try (Bol<$>(reserved "bool"*>identifier))
+            <|> try (Int<$>(reserved "int"*>identifier))
+parseArgType_testBol = parse parseArgType "" "bool x"
+parseArgType_testInt = parse parseArgType "" "int x"
 
-parseDeclaration = ()
--- parseArgType = try (Bol<$>reserved "bool")
---             <|> try (Int<$>reserved "int")
--- parseVarDecl = try (VarDecl <$> parseArgType *>reserved "bool")
+parseVarDecl:: Parser Commands
+parseVarDecl = VarDecl <$> parseArgType <*> parseExpr
+parseVarDecl_test1 = parse parseVarDecl "" "int x = 2"
+
+
+
+
+
 
 --
 -- -- Condition parser
