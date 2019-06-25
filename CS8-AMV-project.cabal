@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 4e629c7504cba4592cf35300467861a7159a5f94de0533cea24e730c433843d9
+-- hash: b03ba15ed73988976d1e831a6165302536ba8788c1a35a7f42b6c29ede41d4de
 
 name:           CS8-AMV-project
 version:        0.1.0.0
@@ -20,7 +20,10 @@ extra-source-files:
 
 library
   exposed-modules:
+      Generator
       Lib
+      Parser
+      TestParser
   other-modules:
       Paths_CS8_AMV_project
   hs-source-dirs:
@@ -28,6 +31,7 @@ library
   build-depends:
       base >=4.7 && <5
     , parsec
+    , sprockell
   default-language: Haskell2010
 
 executable project-exe
@@ -41,6 +45,7 @@ executable project-exe
       CS8-AMV-project
     , base >=4.7 && <5
     , parsec
+    , sprockell
   default-language: Haskell2010
 
 test-suite project-test
@@ -55,4 +60,5 @@ test-suite project-test
       CS8-AMV-project
     , base >=4.7 && <5
     , parsec
+    , sprockell
   default-language: Haskell2010
