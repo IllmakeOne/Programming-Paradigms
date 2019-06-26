@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: c2f547d7df6c6646bd28f8d4036093039e8da290917166fb28a2605b0a801a98
+-- hash: 066fe38711b66b578793f235353af7e5f92ff033e769f6250d55895857e3b3f0
 
 name:           PP-AMV-Lang
 version:        0.1.0.0
@@ -23,6 +23,7 @@ library
       Generator
       Lib
       Parser
+      TreeWalker
   other-modules:
       Paths_PP_AMV_Lang
   hs-source-dirs:

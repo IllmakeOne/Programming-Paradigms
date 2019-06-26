@@ -5,18 +5,7 @@ import Text.ParserCombinators.Parsec
 import Text.ParserCombinators.Parsec.Language
 import qualified Text.ParserCombinators.Parsec.Token as Token
 
------ DO WE NEED THIS -----?
-fromLeft' :: Either l r -> l
-fromLeft' (Left x) = x -- Newer GHC versions contain a fromLeft :: l -> Either l r -> l
 
-fromRight' :: Either l r -> r
-fromRight' (Right x) = x -- Newer GHC  versions contain a fromRight :: r -> Either l r -> r
-
-parser :: Parser a -> String -> a
-parser p xs | isLeft res = error $ show $ fromLeft' res
-          | otherwise  = fromRight' res
-  where res = parse p "" xs
----------------------------------------------
 
 data Commands = VarDecl ArgType Expr
               | GlobalVarDecl ArgType Expr
@@ -30,7 +19,7 @@ data Commands = VarDecl ArgType Expr
               | Decr String
               | AddCom String Expr
               | MinCom String Expr
-              | Comment String      --TODO
+              | Comment String      --TODO use endby
               | Nop
               | End
               deriving Show
@@ -84,6 +73,7 @@ languageDef =
                                       , "ya"
                                       , "nu"
                                       , "global"
+                                      , "{", "}"
                                       ]
             , Token.reservedOpNames = [ "+" , "*", "-"
                                       , "<", ">", "==", ">=", "<="
@@ -217,7 +207,7 @@ parseIfExpr = IfExpr <$> parseIfType <*>(reserved "?" *> parens parseCondition)
           <*> braces parseExpr
           <*> braces parseExpr
 parseIfexpr_tesst1 = parse parseIfExpr "" "int ?(2==2){2+1}{2}"
-parseIfexpr_tesst2 = parse parseIfExpr "" "bool ?(2==2){nu}{ya}"
+-- parseIfexpr_tesst2 = parse parseIfExpr "" "bool ?(2==2){nu}{ya}"
 
 parseFactor :: Parser Expr
 parseFactor = try (Constant <$> integer)
@@ -247,21 +237,35 @@ parseCommand = try parseVarDecl
            <|> try (reserved "join"  >> return Join )
            <|> try (Fork<$>(reserved"fork " *> parseBlock))
            <|> try parseNop
-           <|> try parseEnd
            <|> try parsePrint
+           <|> try parseIncr
+           <|> try parseDecr
+           <|> try parseMinCom
+           <|> try parseAddCom
+
 parseCommand_testJoin = parse parseCommand "" "join ;"
-parseCommand_testFork = parse parseCommand "" "fork {int x = 2;}; "
+parseCommand_testFork = parse parseCommand "" "fork {int x = 2;};"
 
 
 
 
 parseBlock :: Parser Bloc
-parseBlock = Block <$>braces parseArrayCommands
-parseBlock_test1 = parse parseBlock "" "{nop;nop;}"
+-- parseBlock = Block <$> parseArrayCommands
+-----------------------------TAAAAAAAAAAAAAAAAAAa-----------------------------
+parseBlock = Block <$> (reserved "{" *> (optional spaces)*> addEnd)
+parseBlock_test1 = parse parseBlock "" "{ nop;nop;}"
+parseBlock_test2 = fromRight (Block []) (parse parseBlock "" "{ int x = 2;nop;}")
+
 
 parseArrayCommands :: Parser [Commands]
+-- parseArrayCommands= (++) <$> many (parseCommand<*semi) <*>parseEnd
 parseArrayCommands= many (parseCommand<*semi)
 parseArrayCommands_test1 = parse parseArrayCommands "" "nop;nop;"
+
+addEnd :: Parser [Commands]
+-- parseArrayCommands= (++) <$> many (parseCommand<*semi) <*>parseEnd
+addEnd = (++) <$> parseArrayCommands <*> ((:)<$>(reserved "}" >> return End) <*> pure [])
+addEnd_test1 = parse addEnd "" "nop;}"
 
 parseArgType:: Parser ArgType
 parseArgType = try (Bol<$>(reserved "bool"*>identifier))
@@ -289,15 +293,13 @@ parseIfCom = IfCom <$> (reserved "if" *> parens parseCondition)
           <*> braces  parseBlock
           <*> braces parseBlock
 parseIfCom_tesst1 = parse parseIfCom "" "if(2==2){x=2;}{nop;}"
--- parseIfCom_tesst2 = parse parseIfExpr "" "?(2==2){x =2}{x =4}"
+parseIfCom_tesst2 = parse parseIfExpr "" "?(2==2){x =2}{x =4}"
 
 parseNop:: Parser Commands
 parseNop = (reserved "nop"  >> return Nop )
 parsenop_test1 = parse parseNop "" "nop"
 
-parseEnd:: Parser Commands
-parseEnd = (reserved "end"  >> return End )
-parseEnd_test1 = parse parseEnd "" "end;"
+
 
 parseMinCom :: Parser Commands
 parseMinCom = (MinCom <$> identifier <*>(reservedOp "-=" *>parseExpr))
@@ -337,53 +339,15 @@ params_test1 = parse params "" "bool h, \n int x, \n bool x"
 -- theWholeShabang =
 
 
-bigtest = parse parseBlock "" "{global int x = 2; bool y = 2; \n func int fib(int x) \n {x = 2; int y=3;}; \nprint x;}"
+bigtest = parse parseBlock "" "{ global int x = 2; bool y = 2; \n func int fib(int x) \n { x = 2; int y=3;}; \nprint x;}"
 
 
 
 
 
-
-
--- -----trash
--- sep1 :: Parser a -> Parser b -> Parser [a]
--- sep1 a b =
---   (:)<$>a<*>(some$ b*>(whitespace$a))
---   <|> (\x -> [x])<$>(a)
---
-
-
-
---
--- -- Condition parser
--- condition :: Parser Condition
--- condition = (Lt <$>expr<*>((symbol "<")*>expr) )
---           <|> (Eq <$>expr<*>((symbol "==")*>expr))
---           <|> (Gt <$>expr<*>((symbol ">")*>expr))
--- test_cond = runParser condition (Stream " 2 > 2 ")
---
--- -- Factor parser
--- factor :: Parser Expr
--- factor = (Constant <$> integer)
---       <|> (If <$>((symbol "if")*>parens condition)
---               <*>((symbol "then")*>curly expr)
---               <*>((symbol "else")*>curly expr))
---       <|> (Funct <$> identifier<*>(parens$ sep1 expr (char ',') ))
---       <|> (Paren <$> parens expr)
---       <|> (Identifier <$> identifier)
---
--- -- Decl parser (we name every function a declaration)
--- decl :: Parser Functio
--- decl = (FunctionData <$> identifier <*>
---                      (whitespace$ many$expr)      <*>
---                      ((symbol ":=")   *>
---                      (whitespace$ expr))          <*
---                      (whitespace$ (char ';'))
---        )
---
---
---
-
+fromRight :: b -> Either a b -> b
+fromRight b (Left _) = b
+fromRight _ (Right b) = b
 
 
 
