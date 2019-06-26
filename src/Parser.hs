@@ -19,8 +19,8 @@ parser p xs | isLeft res = error $ show $ fromLeft' res
 ---------------------------------------------
 
 data Commands = VarDecl ArgType Expr
-              | FunDecl String [ArgType] Bloc
-              | Fork Commands
+              | FunDecl ArgType [ArgType] Bloc
+              | Fork Bloc
               | Join
               | Print Expr
               | Ass String Expr
@@ -29,20 +29,21 @@ data Commands = VarDecl ArgType Expr
               | Decr String
               | AddCom String Expr
               | MinCom String Expr
-              -- | Nop
+              | Comment String      --TODO
+              | Nop
               deriving Show
 
 data ArgType = Bol String | Int String
       deriving Show
 
+
 data Bloc = Block [Commands]
       deriving Show
 -- data Declaration =
 
-data Functio = FunctionData String [Expr] Expr
-    deriving Show
 
 data Expr = Constant Integer
+            | BoolConst Bool
             | Identifier String
             | Mult Expr Expr
             | Add Expr Expr
@@ -75,6 +76,9 @@ languageDef =
                                       , "?"
                                       , "if"
                                       , "nop"
+                                      , "ya"
+                                      , "nu"
+                                      , "global"
                                       ]
             , Token.reservedOpNames = [ "+" , "*", "-"
                                       , "<", ">", "==", ">=", "<="
@@ -89,6 +93,9 @@ lexer = Token.makeTokenParser languageDef
 
 identifier :: Parser String
 identifier = Token.identifier lexer
+
+-- commentline :: Parser String
+-- commentline = Token.commentLine lexer
 
 integer :: Parser Integer
 integer = Token.integer lexer
@@ -122,6 +129,10 @@ commaSep = Token.commaSep lexer
 
 semisep :: Parser a -> Parser [a]
 semisep = Token.semiSep lexer
+--
+-- commentline :: Parser String
+-- commentline = Token.commentLine lexer
+
 
 parseCondition :: Parser Condition
 parseCondition = try ((Eq <$> parseExpr) <*> (symbol "==" *> parseExpr))
@@ -156,6 +167,8 @@ parseExpr =
       --  (parseTerm `chainl1` addition)
       -- <|>  (parseTerm `chainl1` subtraction)
       <|> try (parseTerm)
+      <|> try ((reserved "ya"  >> return (BoolConst True )))
+      <|> try ((reserved "nu"  >> return (BoolConst False )))
 
       -- parseExpr = try (Add <$> parseTerm<*>reservedOp "+"<*>parseTerm)
       --       <|> try ((parseTerm `chainl1` subtraction)
@@ -163,6 +176,8 @@ parseExpr =
 parseExpr_test1 = parse parseExpr "" "3+3*2"
 parseExpr_test2 = parse parseExpr "" "fib(2) + 32"
 parseExpr_test3 = parse parseExpr "" "2 - 32 +2"
+parseExpr_testnu = parse parseExpr "" "nu"
+parseExpr_testya = parse parseExpr "" "ya"
 
 
 -- Term parser
@@ -199,7 +214,25 @@ parsefactor_testCosnt = parse parseFactor "" "2"
 parsefactor_testIdent = parse parseFactor "" "x"
 parsefactor_testIfexpr = parse parseFactor "" "?(2<x){2+x}{2+3}"
 
------------------------Parse Commands-----------------------------------
+
+
+
+
+
+----------------------------------------------------------------------------------
+-----------------------Parse Commands----------------------------------------------
+
+parseCommand :: Parser Commands
+parseCommand = try parseVarDecl
+           <|> try parseAss
+           <|> try parseIfCom
+           <|> (reserved "join" *> semi  >> return Join )
+           -- <|> try (Join<$> reserved "join" *>)
+           <|> try (Fork<$>(reserved"fork " *> braces parseBlock) <*semi)
+           <|> try parseNop
+parseCommand_testJoin = parse parseCommand "" "join ;"
+parseCommand_testFork = parse parseCommand "" "fork {int x = 2;}; "
+
 parseArgType:: Parser ArgType
 parseArgType = try (Bol<$>(reserved "bool"*>identifier))
             <|> try (Int<$>(reserved "int"*>identifier))
@@ -220,20 +253,20 @@ parseIfCom :: Parser Commands
 parseIfCom = IfCom <$> (reserved "if" *> parens parseCondition)
           <*> braces  parseBlock
           <*> braces parseBlock
-parseIfCom_tesst1 = parse parseIfCom "" "if(2==2){x=2;}{x=3;}"
+parseIfCom_tesst1 = parse parseIfCom "" "if(2==2){x=2;}{nop;}"
 -- parseIfCom_tesst2 = parse parseIfExpr "" "?(2==2){x =2}{x =4}"
 
--- parseNop:: Parser Commands
--- parseNop = Nop <$> reserved "nop"
-
+parseNop:: Parser Commands
+parseNop = (reserved "nop" *> semi  >> return Nop )
+parsenop_test1 = parse parseNop "" "nop;"
 
 parseArrayCommands :: Parser [Commands]
 parseArrayCommands = semisep parseCommand
-parseArrayCommands_test1 = parse parseArrayCommands "" "x=2;y=3;3"
+parseArrayCommands_test1 = parse parseArrayCommands "" "x=2; y=3;"
 
 parseBlock :: Parser Bloc
 parseBlock = Block <$> semisep parseCommand
-parseBlock_test1 = parse parseBlock "" "x=2;y=3;"
+parseBlock_test1 = parse parseBlock "" "nop;y=3;"
 
 parseMinCom :: Parser Commands
 parseMinCom = (MinCom <$> identifier <*>(reservedOp "-=" *>parseExpr)<*semi)
@@ -251,22 +284,29 @@ parseDecr :: Parser Commands
 parseDecr = (Decr <$> identifier <*(reservedOp "--")<*semi)
 parseDecr_test1 = parse parseDecr "" "x --;"
 
+-- parseComment :: Parser Commands
+-- parseComment = (Comment <$> (commentLine <*semi))
+-- parseComment_test1 = parse parseComment "" "x --;"
+
 parsePrint :: Parser Commands
 parsePrint = (Print <$>(reserved "print"*>parseExpr)<*semi)
 parsePrint_test1 = parse parsePrint "" "print 2;"
 parsePrint_test2 = parse parsePrint "" "print ?(2<x){2+x}{2+3};"
 
-parseCommand :: Parser Commands
-parseCommand = try parseVarDecl
-              <|> try parseAss
-              <|> try parseIfCom
+parseFunDecl :: Parser Commands
+parseFunDecl = FunDecl <$> (reserved "func" *> parseArgType)
+                    <*> parens params <*>braces parseBlock
+parseFunDecl_test1 = parse parseFunDecl "" "func int theStuff(int a, bool b){int x = a;}"
+
+params :: Parser [ArgType]
+params = commaSep parseArgType
+params_test1 = parse params "" "bool h,int x"
+
+-- theWholeShabang :: Parser Bloc
+-- theWholeShabang =
 
 
-
-
-
-
-
+-- bigtest = parse parseCommand
 
 
 
