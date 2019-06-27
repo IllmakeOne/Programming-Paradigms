@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: cfae2ce65cff1fe9ebb5aea246590e1a4067025d10b0750e72c645b2c972c651
+-- hash: 066fe38711b66b578793f235353af7e5f92ff033e769f6250d55895857e3b3f0
 
 name:           PP-AMV-Lang
 version:        0.1.0.0
