@@ -25,16 +25,30 @@ data Commands = VarDecl ArgType Expr
               | Nop
               | End
               | Return Expr
-              deriving (Eq,Show)
+            deriving (Eq,Show)
 
-data ArgType = Bol String | Int String | Void String
+data ArgType = Arg Type String -- Bol String | Int String | Void String
       deriving (Eq,Show)
 
 data Param = ByVal ArgType | ByRef ArgType
       deriving (Eq,Show)
 
-data IfType = SimplyBol | SimplyInt | SimplyNull
+data Type = SimplyBol | SimplyInt | SimplyNull
       deriving (Eq,Show)
+
+
+------------delete tthis
+
+data Affir = Da | Nu
+      deriving (Eq,Show)
+data Random = Ugh Affir String
+      deriving (Eq,Show)
+parseAFir :: Parser Random
+parseAFir = try (Ugh<$>(reserved "ya" >> return Da )<*>identifier)
+      <|> try (Ugh<$>(reserved "nu" >> return Nu) <*>identifier)
+parseAFir_test = parse parseAFir "" "ya asd"
+------------------
+
 
 
 data Bloc = Block [Commands]
@@ -48,7 +62,7 @@ data Expr = Constant Integer
             | Mult Expr Expr
             | Add Expr Expr
             | Funct String [Expr]
-            | IfExpr IfType Condition Expr Expr
+            | IfExpr Type Condition Expr Expr
             | Paren Expr
             | Min Expr Expr
             deriving (Eq,Show)
@@ -205,14 +219,19 @@ parameters :: Parser [Expr]
 parameters = commaSep parseExpr
 parameters_test1 = parse parameters "" "2,x"
 
-parseIfType :: Parser IfType
-parseIfType = try (reserved "bool"  >> return SimplyBol )
+parseType :: Parser Type
+parseType = try (reserved "bool"  >> return SimplyBol )
           <|> try (reserved "int"  >> return SimplyInt )
-parseIfType_testbool = parse parseIfType "" "bool"
-parseIfType_testint = parse parseIfType "" "int"
+parseType_testbool = parse parseType "" "bool"
+parseType_testint = parse parseType "" "int"
+
+parseVoidType :: Parser Type
+parseVoidType = try (reserved "void"  >> return SimplyNull )
+parseVoidType_test = parse parseVoidType "" "void"
+
 
 parseIfExpr :: Parser Expr
-parseIfExpr = IfExpr <$> parseIfType <*>(reserved "?" *> parens parseCondition)
+parseIfExpr = IfExpr <$> parseType <*>(reserved "?" *> parens parseCondition)
           <*> braces parseExpr
           <*> braces parseExpr
 parseIfexpr_tesst1 = parse parseIfExpr "" "int ?(2==2){2+1}{2}"
@@ -286,13 +305,12 @@ parseFuncCall = FunCall <$> identifier<*> parens parameters
 parseFuncCall_test1 = parse parseFuncCall "" "demote(x,2);"
 
 parseArgType:: Parser ArgType
-parseArgType = try (Bol<$>(reserved "bool"*>identifier))
-            <|> try (Int<$>(reserved "int"*>identifier))
+parseArgType = try (Arg <$>parseType<*>identifier)
 parseArgType_testBol = parse parseArgType "" "bool x"
 parseArgType_testInt = parse parseArgType "" "int x"
 
 parseArgTypeVoid:: Parser ArgType
-parseArgTypeVoid = Void<$>( reserved "void"*>identifier)
+parseArgTypeVoid = Arg <$>parseVoidType<*>identifier
 parseArgTypeVoid_testvoid = parse parseArgTypeVoid "" "void fib"
 
 parseVarDecl:: Parser Commands
@@ -321,8 +339,6 @@ parseIfCom_tesst3 = parse parseIfExpr "" "?(2==2){x =2}{x =4}"
 parseNop:: Parser Commands
 parseNop = (reserved "nop"  >> return Nop )
 parsenop_test1 = parse parseNop "" "nop"
-
-
 
 parseMinCom :: Parser Commands
 parseMinCom = (MinCom <$> identifier <*>(reservedOp "-=" *>parseExpr))

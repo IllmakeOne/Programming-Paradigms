@@ -52,9 +52,14 @@ treeBuilder ((GlobalVarDecl arg expr):xs) scope off | checkDuplicant db arg scop
       add = (DB arg 0 (scopesTracker off scope))
         -- (DB arg 0 (scopesTracker off scope)): treeBuilder xs scope (increaseOffset off scope)
 
-treeBuilder ((FunDecl arg args bloc):xs) scope off =
-          (DB arg 0 0): treeBuilder (fromBlock bloc) (scope+1) (increaseOffset off (scope+1))
-           ++ treeBuilder xs scope off
+treeBuilder ((FunDecl arg args bloc):xs) scope off | checkDuplicant db arg scope = add:ownscope ++ db
+                                                   | otherwise = error "Dupicant declaration in same scope "
+    where
+      db = treeBuilder xs scope off
+      ownscope = treeBuilder (fromBlock bloc) (scope+1) (increaseOffset off (scope+1))
+      add = (DBF arg args bloc)
+          -- (DB arg 0 0): treeBuilder (fromBlock bloc) (scope+1) (increaseOffset off (scope+1))
+          --  ++ treeBuilder xs scope off
 treeBuilder ((Fork bloc):xs) scope off =
     treeBuilder (fromBlock bloc) (scope+1) off ++ treeBuilder xs scope off
 treeBuilder (x:xs) scope off = treeBuilder xs scope off
@@ -65,7 +70,7 @@ treeBuilder_test1 = treeBuilder
           aux))
           1 [(1,0)]
 aux = parse parseBlock ""
-      "{ int a =2 ;int b =3; func int fib (int x){\n int x = 0;int a = 2;};int a = 2;}; }"
+      "{ global int a =2 ;int b =3; func int fib (int x){\n int x = 0;int a = 2;};int a = 2;}; }"
 
 
 checkDuplicant :: [DataBase]-> ArgType ->Int -> Bool
@@ -95,20 +100,17 @@ typeCheck (GlobalVarDecl typ ex) db  =fromArgtype typ == typeExpr ex db
 -- typeCheck (AddCom name ex) db  = findinDb name db == typeExpr ex db
 -- typeCheck (MinCom name ex) db  = findinDb name db == typeExpr ex db
 
-fromArgtype:: ArgType -> IfType
-fromArgtype (Bol _ ) = SimplyBol
-fromArgtype (Int _ ) = SimplyInt
-fromArgtype (Void _ ) = SimplyNull
+fromArgtype:: ArgType -> Type
+fromArgtype (Arg t _ ) = t
 
 
--- findinDb:: String -> [DataBase] -> IfType
+-- findinDb:: String -> [DataBase] -> Type
 -- findinDb name db |
 
 stringArtgType :: ArgType ->  String
-stringArtgType (Bol x ) = x
-stringArtgType (Int x ) = x
+stringArtgType (Arg _ x ) = x
 
-typeExpr :: Expr -> [DataBase]-> IfType
+typeExpr :: Expr -> [DataBase]-> Type
 typeExpr (Constant _ ) db = SimplyInt
 typeExpr (BoolConst _ ) db = SimplyBol
 typeExpr (Mult e1 e2 ) db | not (t1 == t2) = error "Mutiplication elements are not the same type"
