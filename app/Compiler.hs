@@ -2,14 +2,30 @@
 import System.Environment
 import System.IO
 import Text.ParserCombinators.Parsec
+import Text.Parsec.String
 import Control.Monad
+import Parser
 
 
 main = do args <- getArgs
           case length args of
                0 -> askForFile
-               1 -> compile $ args !! 0
-               otherwise -> putStrLn "AMV compiler takes only 0 or 1 argument"
+               2-> command args
+               otherwise -> putStrLn "AMV compiler takes only 0 or 2 arguments"
+
+command :: [String] -> IO ()
+command args = do
+  case args !! 0 of
+    "ast" -> makeAST $ args !! 1
+    otherwise -> putStrLn "ALRIGHT WE're going to compile (not implemented yet)"
+
+makeAST :: String -> IO ()
+makeAST file = do
+  result <- parseFromFile parseBlock file
+  case result of
+    Left err -> print err
+    Right xs -> print xs
+
 
 askForFile :: IO ()
 askForFile = putStrLn "Je moeder"
@@ -22,11 +38,11 @@ askForFile = putStrLn "Je moeder"
 -- -- getFileContents :: String -> IO String
 -- getFileContents fileName = hGetContents $ openFileWithName fileName
 
-compile :: String -> IO ()
-compile file = do
-  handle <- openFile file ReadMode
-  contents <- hGetContents handle
-  putStr contents
+-- compile :: String -> IO ()
+-- compile file = do
+--   handle <- openFile file ReadMode
+--   contents <- hGetContents handle
+--   putStr contents
 
 
 
