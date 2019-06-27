@@ -9,7 +9,7 @@ import qualified Text.ParserCombinators.Parsec.Token as Token
 
 data Commands = VarDecl ArgType Expr
               | GlobalVarDecl ArgType Expr
-              | FunDecl ArgType [ArgType] Bloc
+              | FunDecl ArgType [Param] Bloc
               | FunCall String [Expr]
               | Fork Bloc
               | Join
@@ -28,6 +28,9 @@ data Commands = VarDecl ArgType Expr
               deriving Show
 
 data ArgType = Bol String | Int String | Void String
+      deriving (Eq,Show)
+
+data Param = ByVal ArgType | ByRef ArgType
       deriving (Eq,Show)
 
 data IfType = SimplyBol | SimplyInt
@@ -79,6 +82,7 @@ languageDef =
                                       , "global"
                                       , "{", "}"
                                       , "return"
+                                      , "&"
                                       ]
             , Token.reservedOpNames = [ "+" , "*", "-"
                                       , "<", ">", "==", ">=", "<="
@@ -259,7 +263,8 @@ parseCommand_testReturn = parse parseCommand "" "return 2;"
 
 parseBlock :: Parser Bloc
 -- parseBlock = Block <$> parseArrayCommands
-parseBlock = Block <$> (reserved "{" *> (optional spaces)*> addEnd)
+-- parseBlock = Block <$> (reserved "{" *> (optional spaces)*> addEnd)
+parseBlock = Block <$> (reserved "{" *>  addEnd)
 parseBlock_test1 = parse parseBlock "" "{ nop;nop;}"
 parseBlock_test2 = fromRight (Block []) (parse parseBlock "" "{ int x = 2;nop;}")
 
@@ -351,16 +356,21 @@ parseFunDecl = try (FunDecl <$> (reserved "func" *> parseArgType)
                                   <*> parens params <*>parseBlock
 parseFunDecl_test1 = parse parseFunDecl "" "func int theStuff(int a, bool b){int x = a;}"
 
-params :: Parser [ArgType]
-params = commaSep parseArgType
-params_test1 = parse params "" "bool h, \n int x, \n bool x"
+parseParam:: Parser Param
+parseParam = try (ByRef <$> (reserved "&" *>parseArgType))
+            <|> (ByVal <$> parseArgType)
+parseParam__test1 = parse parseParam "" "& int x"
+
+params :: Parser [Param]
+params = commaSep (parseParam)
+params_test1 = parse params "" "& bool h, \n int x, \n bool x"
 
 -- theWholeShabang :: Parser Bloc
 -- theWholeShabang =
 
 
 bigtest = parse parseBlock ""
-          "{ int jesse = 1000; global int robert = 1000; while(robert == 0){ jesse++;}; int marieke = 5000; func int transfer(int from, int to, int amount) { jesse++; if (from >= amount) { from -= amount; to += amount;} {};}; func void helicopterMoney(int to, int amount) { to += amount;  };  fork { helicopterMoney(jesse, 9000);};  fork { helicopterMoney(robert, 9000);}; join;  print  jesse;  };"
+          "{ int jesse = 1000; global int robert = 1000; while(robert == 0){ jesse++;}; int marieke = 5000; func int transfer(& int from,& int to, int amount) { jesse++; if (from >= amount) { from -= amount; to += amount;} {};}; func void helicopterMoney(int to, int amount) { to += amount;  };  fork { helicopterMoney(jesse, 9000);};  fork { helicopterMoney(robert, 9000);}; join;  print  jesse;  };"
 
 
 
