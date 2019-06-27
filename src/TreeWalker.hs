@@ -14,7 +14,7 @@ import qualified Text.ParserCombinators.Parsec.Token as Token
 data Function = DBFunction ArgType [ArgType]
     deriving Show
 
-data DataBase = DB ArgType Int Int
+data DataBase = DB ArgType Int Int -- | DBF ArgType Block
     -- //first int scopes, second int is scope offset, third i offest within scope
       deriving (Eq,Show)
 

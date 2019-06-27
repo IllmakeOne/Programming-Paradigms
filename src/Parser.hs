@@ -10,11 +10,13 @@ import qualified Text.ParserCombinators.Parsec.Token as Token
 data Commands = VarDecl ArgType Expr
               | GlobalVarDecl ArgType Expr
               | FunDecl ArgType [ArgType] Bloc
+              | FunCall String [Expr]
               | Fork Bloc
               | Join
               | Print Expr
               | Ass String Expr
               | IfCom Condition Bloc Bloc
+              | While Condition Bloc
               | Incr String
               | Decr String
               | AddCom String Expr
@@ -22,9 +24,10 @@ data Commands = VarDecl ArgType Expr
               | Comment String      --TODO use endby
               | Nop
               | End
+              | Return Expr
               deriving Show
 
-data ArgType = Bol String | Int String
+data ArgType = Bol String | Int String | Void String
       deriving (Eq,Show)
 
 data IfType = SimplyBol | SimplyInt
@@ -67,6 +70,7 @@ languageDef =
                                       , "func"
                                       , "int"
                                       , "bool"
+                                      , "void"
                                       , "?"
                                       , "if"
                                       , "nop"
@@ -74,6 +78,7 @@ languageDef =
                                       , "nu"
                                       , "global"
                                       , "{", "}"
+                                      , "return"
                                       ]
             , Token.reservedOpNames = [ "+" , "*", "-"
                                       , "<", ">", "==", ">=", "<="
@@ -235,27 +240,28 @@ parseCommand = try parseVarDecl
            <|> try parseIfCom
            <|> try parseFunDecl
            <|> try (reserved "join"  >> return Join )
-           <|> try (Fork<$>(reserved"fork " *> parseBlock))
+           <|> try (Fork<$>(reserved"fork" *> parseBlock))
+           <|> try (Return<$>(reserved "return" *> parseExpr))
            <|> try parseNop
            <|> try parsePrint
            <|> try parseIncr
            <|> try parseDecr
            <|> try parseMinCom
            <|> try parseAddCom
-
+           <|> try parseFuncCall
+           <|> try parseWhile
 parseCommand_testJoin = parse parseCommand "" "join ;"
 parseCommand_testFork = parse parseCommand "" "fork {int x = 2;};"
+parseCommand_testReturn = parse parseCommand "" "return 2;"
 
 
 
 
 parseBlock :: Parser Bloc
 -- parseBlock = Block <$> parseArrayCommands
------------------------------TAAAAAAAAAAAAAAAAAAa-----------------------------
 parseBlock = Block <$> (reserved "{" *> (optional spaces)*> addEnd)
 parseBlock_test1 = parse parseBlock "" "{ nop;nop;}"
 parseBlock_test2 = fromRight (Block []) (parse parseBlock "" "{ int x = 2;nop;}")
-
 
 parseArrayCommands :: Parser [Commands]
 -- parseArrayCommands= (++) <$> many (parseCommand<*semi) <*>parseEnd
@@ -263,15 +269,26 @@ parseArrayCommands= many (parseCommand<*semi)
 parseArrayCommands_test1 = parse parseArrayCommands "" "nop;nop;"
 
 addEnd :: Parser [Commands]
--- parseArrayCommands= (++) <$> many (parseCommand<*semi) <*>parseEnd
 addEnd = (++) <$> parseArrayCommands <*> ((:)<$>(reserved "}" >> return End) <*> pure [])
 addEnd_test1 = parse addEnd "" "nop;}"
+
+parseWhile::Parser Commands
+parseWhile = While <$>(reserved "while" *>parens parseCondition) <*> parseBlock
+parseWhile_test1 = parse parseWhile "" "while ( x < 2 ) { x++;};"
+
+parseFuncCall::Parser Commands
+parseFuncCall = FunCall <$> identifier<*> parens parameters
+parseFuncCall_test1 = parse parseFuncCall "" "demote(x,2);"
 
 parseArgType:: Parser ArgType
 parseArgType = try (Bol<$>(reserved "bool"*>identifier))
             <|> try (Int<$>(reserved "int"*>identifier))
 parseArgType_testBol = parse parseArgType "" "bool x"
 parseArgType_testInt = parse parseArgType "" "int x"
+
+parseArgTypeVoid:: Parser ArgType
+parseArgTypeVoid = Void<$>( reserved "void"*>identifier)
+parseArgTypeVoid_testvoid = parse parseArgTypeVoid "" "void fib"
 
 parseVarDecl:: Parser Commands
 parseVarDecl = VarDecl <$> parseArgType <*>(reservedOp "=" *> parseExpr)
@@ -290,10 +307,11 @@ parseAss_test2 = parse parseAss "" "x = fib(2);"
 
 parseIfCom :: Parser Commands
 parseIfCom = IfCom <$> (reserved "if" *> parens parseCondition)
-          <*> braces  parseBlock
-          <*> braces parseBlock
+          <*>  parseBlock
+          <*>  parseBlock
 parseIfCom_tesst1 = parse parseIfCom "" "if(2==2){x=2;}{nop;}"
-parseIfCom_tesst2 = parse parseIfExpr "" "?(2==2){x =2}{x =4}"
+parseIfCom_tesst2 = parse parseIfCom ""  "if (from >= amount) { from -= amount; to += amount;} {};"
+parseIfCom_tesst3 = parse parseIfExpr "" "?(2==2){x =2}{x =4}"
 
 parseNop:: Parser Commands
 parseNop = (reserved "nop"  >> return Nop )
@@ -327,8 +345,10 @@ parsePrint_test1 = parse parsePrint "" "print 2;"
 parsePrint_test2 = parse parsePrint "" "print ?(2<x){2+x}{2+3};"
 
 parseFunDecl :: Parser Commands
-parseFunDecl = FunDecl <$> (reserved "func" *> parseArgType)
-                    <*> parens params <*>parseBlock
+parseFunDecl = try (FunDecl <$> (reserved "func" *> parseArgType)
+                    <*> parens params <*>parseBlock)
+              <|> FunDecl <$> (reserved "func" *> parseArgTypeVoid)
+                                  <*> parens params <*>parseBlock
 parseFunDecl_test1 = parse parseFunDecl "" "func int theStuff(int a, bool b){int x = a;}"
 
 params :: Parser [ArgType]
@@ -339,7 +359,9 @@ params_test1 = parse params "" "bool h, \n int x, \n bool x"
 -- theWholeShabang =
 
 
-bigtest = parse parseBlock "" "{ global int x = 2; bool y = 2; \n func int fib(int x) \n { x = 2; int y=3;}; \nprint x;}"
+bigtest = parse parseBlock ""
+          "{ int jesse = 1000; global int robert = 1000; while(robert == 0){ jesse++;}; int marieke = 5000; func int transfer(int from, int to, int amount) { jesse++; if (from >= amount) { from -= amount; to += amount;} {};}; func void helicopterMoney(int to, int amount) { to += amount;  };  fork { helicopterMoney(jesse, 9000);};  fork { helicopterMoney(robert, 9000);}; join;  print  jesse;  };"
+
 
 
 
