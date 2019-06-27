@@ -25,7 +25,7 @@ data Commands = VarDecl ArgType Expr
               | Nop
               | End
               | Return Expr
-              deriving Show
+              deriving (Eq,Show)
 
 data ArgType = Bol String | Int String | Void String
       deriving (Eq,Show)
@@ -33,12 +33,12 @@ data ArgType = Bol String | Int String | Void String
 data Param = ByVal ArgType | ByRef ArgType
       deriving (Eq,Show)
 
-data IfType = SimplyBol | SimplyInt
+data IfType = SimplyBol | SimplyInt | SimplyNull
       deriving (Eq,Show)
 
 
 data Bloc = Block [Commands]
-      deriving Show
+      deriving (Eq,Show)
 -- data Declaration =
 
 
