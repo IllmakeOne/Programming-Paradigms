@@ -14,7 +14,8 @@ The AMV language is implemented in Haskell. Therefore you need to have
 
 ## Get a working compiler
 * `stack exec amv` (This will ask for input)
-* `stack exec -- amv filename.amv` (Run the compiler with a specified file name)
+* `stack exec -- amv filename.amv` (Run the compiler with a specified file name,
+  it will take only the first argument in consideration)
 
 ## Test
 * `stack test`

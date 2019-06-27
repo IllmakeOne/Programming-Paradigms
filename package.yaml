@@ -19,6 +19,7 @@ description:         Please see the README.
 
 dependencies:
 - base >= 4.7 && < 5
+- containers
 - parsec
 - sprockell
 
@@ -27,7 +28,7 @@ library:
 
 executables:
   amv:
-    main:                Main.hs
+    main:                Compiler.hs
     source-dirs:         app
     ghc-options:
     - -threaded
