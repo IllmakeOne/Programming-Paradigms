@@ -23,7 +23,6 @@ library
       Generator
       Lib
       Parser
-      SymbolTable
       TreeWalker
   other-modules:
       Paths_PP_AMV_Lang
