@@ -27,10 +27,10 @@ data Commands = VarDecl ArgType Expr
               | Return Expr
             deriving (Eq,Show)
 
-data ArgType = Arg Type String -- Bol String | Int String | Void String
+data Param = ByVal ArgType | ByRef ArgType
       deriving (Eq,Show)
 
-data Param = ByVal ArgType | ByRef ArgType
+data ArgType = Arg Type String -- Bol String | Int String | Void String
       deriving (Eq,Show)
 
 data Type = SimplyBol | SimplyInt | SimplyNull
@@ -275,7 +275,7 @@ parseCommand = try parseVarDecl
            <|> try parseWhile
 parseCommand_testJoin = parse parseCommand "" "join ;"
 parseCommand_testFork = parse parseCommand "" "fork {int x = 2;};"
-parseCommand_testReturn = parse parseCommand "" "return 2;"
+parseCommand_testReturn = parse parseCommand "" "return int ?(x<2) {2}{3};"
 
 
 

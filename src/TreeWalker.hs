@@ -53,7 +53,7 @@ treeBuilder ((GlobalVarDecl arg expr):xs) scope off | checkDuplicant db arg scop
         -- (DB arg 0 (scopesTracker off scope)): treeBuilder xs scope (increaseOffset off scope)
 
 treeBuilder ((FunDecl arg args bloc):xs) scope off | checkDuplicant db arg scope = add:ownscope ++ db
-                                                   | otherwise = error "Dupicant declaration in same scope "
+                                                   | otherwise = error "Dupicant Method in program "
     where
       db = treeBuilder xs scope off
       ownscope = treeBuilder (fromBlock bloc) (scope+1) (increaseOffset off (scope+1))
@@ -70,13 +70,16 @@ treeBuilder_test1 = treeBuilder
           aux))
           1 [(1,0)]
 aux = parse parseBlock ""
-      "{ global int a =2 ;int b =3; func int fib (int x){\n int x = 0;int a = 2;};int a = 2;}; }"
+      "{ global int a =2 ;int b =3; func int fib (int x){\n int x = 0;int a = 2;}; func int fib(int x) {};}; }"
 
 
 checkDuplicant :: [DataBase]-> ArgType ->Int -> Bool
 checkDuplicant [] _ _ = True
 checkDuplicant (( DB dbarg sco _):xs) arg scope
       | scope == sco && stringArtgType dbarg == stringArtgType arg = False
+      | otherwise = checkDuplicant xs arg scope
+checkDuplicant ((DBF name params bloc):xs) arg scope
+      | stringArtgType name == stringArtgType arg = False
       | otherwise = checkDuplicant xs arg scope
 
 
@@ -115,20 +118,20 @@ typeExpr (Constant _ ) db = SimplyInt
 typeExpr (BoolConst _ ) db = SimplyBol
 typeExpr (Mult e1 e2 ) db | not (t1 == t2) = error "Mutiplication elements are not the same type"
                           | t1 == SimplyInt = SimplyInt
-                          | t1 == SimplyBol = SimplyBol
+                          | t1 == SimplyBol = error "Multiplication of bools not allowed"
         where
           t1 = typeExpr e1 db
           t2 = typeExpr e2 db
 typeExpr (Add e1 e2 ) db | not (t1 == t2) = error "Addition elemets are not the same type"
                        | t1 == SimplyInt = SimplyInt
-                       | t1 == SimplyBol = SimplyBol
+                       | t1 == SimplyBol = error "Addition of bools not allowed"
         where
           t1 = typeExpr e1 db
           t2 = typeExpr e2 db
 typeExpr (Paren x ) db = typeExpr x db
 typeExpr (Min e1 e2 ) db | not (t1 == t2) = error "Substractions elemets are not the same type"
                        | t1 == SimplyInt = SimplyInt
-                       | t1 == SimplyBol = SimplyBol
+                       | t1 == SimplyBol = error "subtraction of bools not allowed"
         where
           t1 = typeExpr e1 db
           t2 = typeExpr e2 db
@@ -160,11 +163,11 @@ typeCheckCondition (Gq e1 e2)  db = typeExpr e1 db == typeExpr e2 db
 
 
 
-functions :: [Commands] -> [Function]
-functions [] = []
-functions ((FunDecl a args irel):xs) = (DBFunction a args) : functions xs
-functions (x:xs) = functions xs
-functions_test1 = functions []
+-- functions :: [Commands] -> [Function]
+-- functions [] = []
+-- functions ((FunDecl a args irel):xs) = (DBFunction a args) : functions xs
+-- functions (x:xs) = functions xs
+-- functions_test1 = functions []
 
 
 
