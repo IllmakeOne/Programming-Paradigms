@@ -1,0 +1,28 @@
+{
+int jesse = 1000;
+global int robert = 1000;
+int marieke = 5000;
+
+func int transfer(& int from, & int to, int amount) {
+    if (from >= amount) {
+        from -= amount;
+        to += amount;
+      } {};
+};
+
+func void helicopterMoney(int to, int amount) {
+    to += amount;
+      while (to < robert) {
+          to +=amount;
+      };
+};
+
+fork { helicopterMoney(jesse, 9000); };
+fork { helicopterMoney(robert, 9000); };
+
+join;
+
+print jesse;
+
+//comments examples
+}
