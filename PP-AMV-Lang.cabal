@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: c2f547d7df6c6646bd28f8d4036093039e8da290917166fb28a2605b0a801a98
+-- hash: cfae2ce65cff1fe9ebb5aea246590e1a4067025d10b0750e72c645b2c972c651
 
 name:           PP-AMV-Lang
 version:        0.1.0.0
@@ -23,19 +23,23 @@ library
       Generator
       Lib
       Parser
+      SymbolTable
+      TreeWalker
   other-modules:
       Paths_PP_AMV_Lang
   hs-source-dirs:
       src
   build-depends:
       base >=4.7 && <5
+    , containers
     , parsec
     , sprockell
   default-language: Haskell2010
 
 executable amv
-  main-is: Main.hs
+  main-is: Compiler.hs
   other-modules:
+      Main
       Paths_PP_AMV_Lang
   hs-source-dirs:
       app
@@ -43,6 +47,7 @@ executable amv
   build-depends:
       PP-AMV-Lang
     , base >=4.7 && <5
+    , containers
     , parsec
     , sprockell
   default-language: Haskell2010
@@ -58,6 +63,7 @@ test-suite amv-test
   build-depends:
       PP-AMV-Lang
     , base >=4.7 && <5
+    , containers
     , parsec
     , sprockell
   default-language: Haskell2010
