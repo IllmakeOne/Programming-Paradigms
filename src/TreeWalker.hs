@@ -30,7 +30,7 @@ scopesTracker_test1 = scopesTracker [(1,0),(2,4)] 2
 
 increaseOffset:: [(Int, Int)] -> Int -> [(Int, Int)]
 increaseOffset [] x = [(x,0)]
-increaseOffset ((a,b):xs) x | a == x = (a,(b+4)):xs
+increaseOffset ((a,b):xs) x | a == x = (a,(b+1)):xs
                             | otherwise = (a,b):increaseOffset xs x
 increaseOffset_test1 = increaseOffset [(1,0),(2,4)] 2
 increaseOffset_test2 = increaseOffset [] 2
@@ -48,7 +48,7 @@ treeBuilder ((VarDecl arg expr):xs) scope off | checkDuplicant db arg scope = ad
 treeBuilder ((GlobalVarDecl arg expr):xs) scope off | checkDuplicant db arg scope = add:db
                                                     | otherwise = error "Dupicant declaration in same scope "
     where
-      db = treeBuilder xs scope (increaseOffset off scope)
+      db = treeBuilder xs scope (increaseOffset off 0)
       add = (DB arg 0 (scopesTracker off scope))
         -- (DB arg 0 (scopesTracker off scope)): treeBuilder xs scope (increaseOffset off scope)
 
@@ -70,7 +70,7 @@ treeBuilder_test1 = treeBuilder
           aux))
           1 [(1,0)]
 aux = parse parseBlock ""
-      "{ global int a =2 ;int b =3; func int fib (int x){\n int x = 0;int a = 2;}; }; }"
+      "{ global int a =2 ;int b =3; func int fib (int x){\n int x = 0;int a = 2;}; int x =2 ;}; }"
 
 
 checkDuplicant :: [DataBase]-> ArgType ->Int -> Bool
