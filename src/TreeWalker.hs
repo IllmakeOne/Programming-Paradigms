@@ -1,6 +1,7 @@
 module TreeWalker where
 
 import Parser
+import Debug.Trace
 import Text.ParserCombinators.Parsec
 import Text.ParserCombinators.Parsec.Language
 import qualified Text.ParserCombinators.Parsec.Token as Token
@@ -14,7 +15,7 @@ import qualified Text.ParserCombinators.Parsec.Token as Token
 data Function = DBFunction ArgType [Param]
     deriving Show
 
-data DataBase = DB ArgType Int Int | DBF ArgType [Param] Bloc
+data DataBase = DB ArgType Int Int | DBF ArgType [Param]
     -- //first int scopes, second int is scope offset, third i offest within scope
       deriving (Eq,Show)
 
@@ -45,10 +46,10 @@ treeBuilder ((VarDecl arg expr):xs) scope off | checkDuplicant db arg scope = ad
     where
       db = treeBuilder xs scope (increaseOffset off scope)
       add = (DB arg scope (scopesTracker off scope))
-treeBuilder ((GlobalVarDecl arg expr):xs) scope off | checkDuplicant db arg scope = add:db
-                                                    | otherwise = error "Dupicant declaration in same scope "
+treeBuilder ((GlobalVarDecl arg expr):xs) scope off | checkDuplicant db arg 0 = add:db
+                                                    | otherwise = error "Dupicant global declaration "
     where
-      db = treeBuilder xs scope (increaseOffset off 0)
+      db = treeBuilder xs scope (increaseOffset (traceShowId off) 0)
       add = (DB arg 0 (scopesTracker off scope))
         -- (DB arg 0 (scopesTracker off scope)): treeBuilder xs scope (increaseOffset off scope)
 
@@ -57,7 +58,7 @@ treeBuilder ((FunDecl arg args bloc):xs) scope off | checkDuplicant db arg scope
     where
       db = treeBuilder xs scope off
       ownscope = treeBuilder (fromBlock bloc) (scope+1) (increaseOffset off (scope+1))
-      add = (DBF arg args bloc)
+      add = (DBF arg args)
           -- (DB arg 0 0): treeBuilder (fromBlock bloc) (scope+1) (increaseOffset off (scope+1))
           --  ++ treeBuilder xs scope off
 treeBuilder ((Fork bloc):xs) scope off =
@@ -70,7 +71,7 @@ treeBuilder_test1 = treeBuilder
           aux))
           1 [(1,0)]
 aux = parse parseBlock ""
-      "{ global int a =2 ;int b =3; func int fib (int x){\n int x = 0;int a = 2;}; int x =2 ;}; }"
+      "{ global int a =2 ;global int b =3; func int fib (int x){\n int x = 0;int a = 2;}; int x =2 ;}; }"
 
 
 checkDuplicant :: [DataBase]-> ArgType ->Int -> Bool
@@ -78,7 +79,7 @@ checkDuplicant [] _ _ = True
 checkDuplicant (( DB dbarg sco _):xs) arg scope
       | scope == sco && stringArtgType dbarg == stringArtgType arg = False
       | otherwise = checkDuplicant xs arg scope
-checkDuplicant ((DBF name params bloc):xs) arg scope
+checkDuplicant ((DBF name params ):xs) arg scope
       | stringArtgType name == stringArtgType arg = False
       | otherwise = checkDuplicant xs arg scope
 
