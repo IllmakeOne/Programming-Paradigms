@@ -70,7 +70,7 @@ treeBuilder_test1 = treeBuilder
           aux))
           1 [(1,0)]
 aux = parse parseBlock ""
-      "{ global int a =2 ;int b =3; func int fib (int x){\n int x = 0;int a = 2;}; func int fib(int x) {};}; }"
+      "{ global int a =2 ;int b =3; func int fib (int x){\n int x = 0;int a = 2;}; }; }"
 
 
 checkDuplicant :: [DataBase]-> ArgType ->Int -> Bool
