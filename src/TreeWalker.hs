@@ -1,6 +1,7 @@
 module TreeWalker where
 
 import Parser
+import Debug.Trace
 import Text.ParserCombinators.Parsec
 import Text.ParserCombinators.Parsec.Language
 import qualified Text.ParserCombinators.Parsec.Token as Token
@@ -14,7 +15,7 @@ import qualified Text.ParserCombinators.Parsec.Token as Token
 data Function = DBFunction ArgType [Param]
     deriving Show
 
-data DataBase = DB ArgType Int Int | DBF ArgType [Param] Bloc
+data DataBase = DB ArgType Int Int | DBF ArgType [Param]
     -- //first int scopes, second int is scope offset, third i offest within scope
       deriving (Eq,Show)
 
@@ -40,16 +41,16 @@ increaseOffset_test2 = increaseOffset [] 2
 
 treeBuilder :: [Commands] -> Int ->[(Int, Int)] -> [DataBase]
 treeBuilder [] _ _ = []
-treeBuilder ((VarDecl arg expr):xs) scope off | checkDuplicant db arg scope = add:db
+treeBuilder ((VarDecl arg expr):xs) scope off | checkDuplicant db arg scope && checkDuplicant db arg 0 = add:db
                                               | otherwise = error "Dupicant declaration in same scope "
     where
       db = treeBuilder xs scope (increaseOffset off scope)
-      add = (DB arg scope (scopesTracker off scope))
-treeBuilder ((GlobalVarDecl arg expr):xs) scope off | checkDuplicant db arg scope = add:db
-                                                    | otherwise = error "Dupicant declaration in same scope "
+      add = (DB arg scope (scopesTracker (increaseOffset off scope) scope))
+treeBuilder ((GlobalVarDecl arg expr):xs) scope off | checkDuplicant db arg 0 = add:db
+                                                    | otherwise = error "Dupicant global declaration "
     where
       db = treeBuilder xs scope (increaseOffset off 0)
-      add = (DB arg 0 (scopesTracker off scope))
+      add = (DB arg 0 (scopesTracker (increaseOffset off 0) 0))
         -- (DB arg 0 (scopesTracker off scope)): treeBuilder xs scope (increaseOffset off scope)
 
 treeBuilder ((FunDecl arg args bloc):xs) scope off | checkDuplicant db arg scope = add:ownscope ++ db
@@ -57,7 +58,7 @@ treeBuilder ((FunDecl arg args bloc):xs) scope off | checkDuplicant db arg scope
     where
       db = treeBuilder xs scope off
       ownscope = treeBuilder (fromBlock bloc) (scope+1) (increaseOffset off (scope+1))
-      add = (DBF arg args bloc)
+      add = (DBF arg args)
           -- (DB arg 0 0): treeBuilder (fromBlock bloc) (scope+1) (increaseOffset off (scope+1))
           --  ++ treeBuilder xs scope off
 treeBuilder ((Fork bloc):xs) scope off =
@@ -66,11 +67,10 @@ treeBuilder (x:xs) scope off = treeBuilder xs scope off
 
 
 treeBuilder_test1 = treeBuilder
-          (fromBlock ( fromRight (Block [])
-          aux))
-          1 [(1,0)]
+          (fromBlock ( fromRight (Block [])  aux))
+          1 []
 aux = parse parseBlock ""
-      "{ global int a =2 ;int b =3; func int fib (int x){\n int x = 0;int a = 2;}; int x =2 ;}; }"
+      "{ global int a =2 ;global int b =3;global bool y = nu; int x =2 ;global int t = 2;}; }"
 
 getOffset :: [DataBase] -> String -> (Int, Int)
 getOffset [] _ = error "getOffset error"
@@ -88,37 +88,54 @@ checkDuplicant [] _ _ = True
 checkDuplicant (( DB dbarg sco _):xs) arg scope
       | scope == sco && stringArtgType dbarg == stringArtgType arg = False
       | otherwise = checkDuplicant xs arg scope
-checkDuplicant ((DBF name params bloc):xs) arg scope
+checkDuplicant ((DBF name params ):xs) arg scope
       | stringArtgType name == stringArtgType arg = False
       | otherwise = checkDuplicant xs arg scope
 
 
 
 
+typeCheckProgram :: [Commands] -> [DataBase] -> Bool
+typeCheckProgram (x:prog) db  | typeCheck db x = typeCheckProgram prog db
+                              | otherwise = error "Tyepe chekcpr porgram eror somehow"
+typeCheckProgram [] _ = True
+typeCheckProgram_test1 =
+  typeCheckProgram (fromBlock ( fromRight (Block [])  aux))
+                   (treeBuilder(fromBlock ( fromRight (Block [])  aux)) 1 [])
+
+
+typeCheck :: [DataBase] -> Commands -> Bool
+typeCheck db (VarDecl typ ex) | typeArgtype typ == typeExpr ex db = True
+                              | otherwise = error "Type error in type declarations"
+typeCheck db (GlobalVarDecl typ ex) | typeArgtype typ == typeExpr ex db = True
+                              | otherwise = error "Type error in global type declarations"
+typeCheck db (FunCall name exprs) | findinDb name db == SimplyNull = True
+                              | otherwise = error "Type error in fucntion call"
+typeCheck db (Ass name ex) | findinDb name db == typeExpr ex db = True
+                              | otherwise = error "Type error in variable assignment"
+typeCheck db (Decr name) | findinDb name db == SimplyInt = True
+                              | otherwise = error "Type error in variable decrese '--' "
+typeCheck db (Incr name) | findinDb name db == SimplyInt = True
+                              | otherwise = error "Type error in variable increaase '++' "
+typeCheck db (AddCom name ex) | findinDb name db == typeExpr ex db = True
+                              | otherwise = error "Type error in add command += "
+typeCheck db (MinCom name ex) | findinDb name db == typeExpr ex db = True
+                              | otherwise = error "Type error in minus commdn -= "
+typeCheck _ _ = True
 
 
 
+typeArgtype:: ArgType -> Type
+typeArgtype (Arg t _ ) = t
 
 
+findinDb:: String -> [DataBase] -> Type
+findinDb name ((DB  arg _ _):dbx) | name == stringArtgType arg = typeArgtype arg
+                                  | otherwise = findinDb name dbx
+findinDb name ((DBF  arg  _):dbx) | name == stringArtgType arg = typeArgtype arg
+                                  | otherwise = findinDb name dbx
+findinDb _ [] = error "undeclared variable called"
 
-
-
-typeCheck :: Commands -> [DataBase]-> Bool
-typeCheck (VarDecl typ ex) db  =fromArgtype typ == typeExpr ex db
-typeCheck (GlobalVarDecl typ ex) db  =fromArgtype typ == typeExpr ex db
--- typeCheck (FunCall name exprs) db  = findinDb name db == SimplyNull --fun calls can only be done on void methods
--- typeCheck (Ass name ex) db  = findinDb name db == typeExpr ex db
--- typeCheck (Decr name db)  = findinDb name db == SimplyInt
--- typeCheck (Incr name db)  = findinDb name db == SimplyInt
--- typeCheck (AddCom name ex) db  = findinDb name db == typeExpr ex db
--- typeCheck (MinCom name ex) db  = findinDb name db == typeExpr ex db
-
-fromArgtype:: ArgType -> Type
-fromArgtype (Arg t _ ) = t
-
-
--- findinDb:: String -> [DataBase] -> Type
--- findinDb name db |
 
 stringArtgType :: ArgType ->  String
 stringArtgType (Arg _ x ) = x
