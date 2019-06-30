@@ -38,7 +38,7 @@ prog = [ Load (ImmValue 1000) regA,
          Load (IndAddr regD) regA,
          Compute Sprockell.Add regA regE regA,
          Store regA (IndAddr regD),
-         
+
 
 
 
