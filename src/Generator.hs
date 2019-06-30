@@ -14,7 +14,7 @@ generation :: Bloc -> [Instruction]
 generation xs = genBlock commands smTable ++ [EndProg]
   where
     commands = fromBlock xs
-    smTable = treeBuilder commands 1 [(1,0)]
+    smTable = treeBuilder commands 1 []
 
 -- generationHelper :: [Commands] -> [DataBase] -> [Instruction]
 -- -- generationHelper [] _ =

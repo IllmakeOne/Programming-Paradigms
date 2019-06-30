@@ -77,9 +77,9 @@ getOffset [] _ = error "getOffset error"
 getOffset (DB (Arg argType argName) x y:xs) name
       | argName == name = (x, y)
       | otherwise = getOffset xs name
-getOffset (DBF fname params bloc:xs) name
-      -- | stringArtgType name == stringArtgType arg = False
-      | otherwise = getOffset xs name
+-- getOffset (DBF fname params) name
+--       -- | stringArtgType name == stringArtgType arg = False
+--       | otherwise = getOffset params name
 
 getOffsetTest = getOffset treeBuilder_test1 "b"
 
