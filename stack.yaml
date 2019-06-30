@@ -15,12 +15,11 @@ resolver: lts-9.21 # The version we used in PP is 8.0.2
 #  - wai
 packages:
 - .
-# Dependency packages to be pulled from upstream that are not in the resolver
-# using the same syntax as the packages field.
-# (e.g., acme-missiles-0.3)
-extra-deps:
-- github: leonschoorl/sprockell
-  commit: b9d26ba27bf4f008f37e863c79338465100a426a
+- sprockell # local dependency as we edited it
+
+# extra-deps:
+# - github: leonschoorl/sprockell
+#   commit: b9d26ba27bf4f008f37e863c79338465100a426a
 
 # Override default flag values for local packages and extra-deps
 # flags: {}
