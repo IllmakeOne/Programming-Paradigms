@@ -82,6 +82,16 @@ treeBuilder_test1 = treeBuilder
 aux = parse parseBlock ""
       "{ func int fib(int x, & int y){}; int x = fib (ya, 2);}"
 
+getOffset :: [DataBase] -> String -> (Int, Int)
+getOffset [] _ = error "getOffset error"
+getOffset (DB (Arg argType argName) x y:xs) name
+      | argName == name = (x, y)
+      | otherwise = getOffset xs name
+-- getOffset (DBF fname params) name
+--       -- | stringArtgType name == stringArtgType arg = False
+--       | otherwise = getOffset params name
+
+getOffsetTest = getOffset treeBuilder_test1 "b"
 
 checkDuplicant :: [DataBase]-> ArgType ->Int -> Bool
 checkDuplicant [] _ _ = True

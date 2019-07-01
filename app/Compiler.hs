@@ -5,7 +5,8 @@ import Text.ParserCombinators.Parsec
 import Text.Parsec.String
 import Control.Monad
 import Parser
-
+import Sprockell
+import Generator
 
 main = do args <- getArgs
           case length args of
@@ -17,6 +18,7 @@ command :: [String] -> IO ()
 command args = do
   case args !! 0 of
     "ast" -> makeAST $ args !! 1
+    "gen" -> generate $ args !! 1
     otherwise -> putStrLn "ALRIGHT WE're going to compile (not implemented yet)"
 
 makeAST :: String -> IO ()
@@ -26,6 +28,16 @@ makeAST file = do
     Left err -> print err
     Right xs -> print xs
 
+generate :: String -> IO ()
+generate file = do
+  result <- parseFromFile parseBlock file
+  case result of
+    Left err -> print err
+    Right xs -> run [generation xs] -- generation from Generator
+
+
+-- runProg :: [Instruction] -> IO ()
+-- runprog run =
 
 askForFile :: IO ()
 askForFile = putStrLn "Je moeder"

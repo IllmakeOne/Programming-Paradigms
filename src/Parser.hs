@@ -7,23 +7,23 @@ import qualified Text.ParserCombinators.Parsec.Token as Token
 
 
 
-data Commands = VarDecl ArgType Expr
+data Commands = VarDecl ArgType Expr          -- DONE IMPLEMENTED IN GENERATOR
               | GlobalVarDecl ArgType Expr
               | FunDecl ArgType [Param] Bloc
               | FunCall String [Expr]
               | Fork Bloc
               | Join
-              | Print Expr
-              | Ass String Expr
-              | IfCom Condition Bloc Bloc
-              | While Condition Bloc
-              | Incr String
-              | Decr String
-              | AddCom String Expr
-              | MinCom String Expr
+              | Print Expr                -- DONE IMPLEMENTED IN GENERATOR
+              | Ass String Expr           -- DONE IMPLEMENTED IN GENERATOR
+              | IfCom Condition Bloc Bloc -- DONE IMPLEMENTED IN GENERATOR
+              | While Condition Bloc      -- DONE IMPLEMENTED IN GENERATOR
+              | Incr String         -- DONE IMPLEMENTED IN GENERATOR
+              | Decr String         -- DONE IMPLEMENTED IN GENERATOR
+              | AddCom String Expr  -- DONE IMPLEMENTED IN GENERATOR
+              | MinCom String Expr  -- DONE IMPLEMENTED IN GENERATOR
               | Comment String      --TODO use endby
-              | Nop
-              | End
+              | Nop                 -- DONE IMPLEMENTED IN GENERATOR
+              | End                 -- DONE IMPLEMENTED IN GENERATOR
               | Return Expr
             deriving (Eq,Show)
 
@@ -56,7 +56,7 @@ data Bloc = Block [Commands]
 -- data Declaration =
 
 
-data Expr = Constant Integer
+data Expr = Constant Integer -- DONE IMPLEMENTED IN GENERATOR
             | BoolConst Bool
             | Identifier String
             | Mult Expr Expr
@@ -68,11 +68,11 @@ data Expr = Constant Integer
             -- | Zero
             deriving (Eq,Show)
 
-data Condition = Lt Expr Expr
-         | Eq Expr Expr
-         | Gt Expr Expr
-         | Lq Expr Expr
-         | Gq Expr Expr
+data Condition = Lt Expr Expr -- DONE IMPLEMENTED IN GENERATOR
+         | Eq Expr Expr -- DONE IMPLEMENTED IN GENERATOR
+         | Gt Expr Expr -- DONE IMPLEMENTED IN GENERATOR
+         | Lq Expr Expr -- DONE IMPLEMENTED IN GENERATOR
+         | Gq Expr Expr -- DONE IMPLEMENTED IN GENERATOR
       deriving (Eq,Show)
 
 languageDef =

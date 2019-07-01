@@ -1,0 +1,16 @@
+{
+int jesse = 1000;
+//comments examples
+print jesse;
+
+
+int marieke = 9999;
+print marieke;
+if (marieke > 9000) {
+  print marieke;
+  marieke = 1234;
+} {
+  print jesse;
+};
+print marieke;
+}
