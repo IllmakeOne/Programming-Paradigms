@@ -1,5 +1,5 @@
 {
-int jesse = 10;
+int jesse = (3+4)*2-2*2; // 10
 while (jesse > 0) {
   print jesse;
   // Works also: jesse--;

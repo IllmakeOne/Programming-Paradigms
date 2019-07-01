@@ -57,14 +57,14 @@ data Bloc = Block [Commands]
 
 
 data Expr = Constant Integer -- DONE IMPLEMENTED IN GENERATOR
-            | BoolConst Bool
-            | Identifier String
-            | Mult Expr Expr
-            | Add Expr Expr
+            | BoolConst Bool -- DONE IMPLEMENTED
+            | Identifier String -- DONE IMPLEMENTED IN GENERATOR
+            | Mult Expr Expr -- DONE IMPLEMENTED
+            | Add Expr Expr -- DONE IMPLEMENTED
             | Funct String [Expr]
-            | IfExpr Type Condition Expr Expr
-            | Paren Expr
-            | Min Expr Expr
+            | IfExpr Type Condition Expr Expr -- inline if statement
+            | Paren Expr    -- DONE IMPLEMENTED
+            | Min Expr Expr -- DONE IMPLEMENTED
             deriving (Eq,Show)
 
 data Condition = Lt Expr Expr -- DONE IMPLEMENTED IN GENERATOR

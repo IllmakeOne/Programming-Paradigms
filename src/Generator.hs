@@ -109,35 +109,58 @@ genVar name expr smTable = genExpr expr smTable  -- Pop that into regD
 genExpr :: Expr -> [DataBase] -> [Instruction]
 -- Generate constant
 genExpr (Constant i) smTable = [Load (ImmValue (fromInteger i)) regE, Push regE]
+-- Generate a boolean
+genExpr (BoolConst bool) smTable = [Load (ImmValue (boolToInt bool)) regE, Push regE]
+-- Generate the parens, just evaluate the expr in between it
+genExpr (Paren expr) smTable = genExpr expr smTable
 -- Generate a reference
 genExpr (Identifier name) smTable = memAddr smTable name
                                     ++ [Load (IndAddr regE) regD, Push regD]
+-- Generate a calculation of two expressions
+genExpr (Parser.Mult exp1 exp2) smTable = genTwoExpr (Sprockell.Mul, exp1, exp2) smTable
+genExpr (Parser.Add exp1 exp2) smTable  = genTwoExpr (Sprockell.Add, exp1, exp2) smTable
+genExpr (Parser.Min exp1 exp2) smTable  = genTwoExpr (Sprockell.Sub, exp1, exp2) smTable
+
+-- Else error out
 genExpr _ smTable = error "genExpr error"
 
--- Evaluates both expressions and pushes back the result to the stack.
-genCond :: Condition -> [DataBase] -> [Instruction]
-genCond cond smTable = genExpr exp1 smTable ++ genExpr exp2 smTable
-                                 ++ [Pop regB, Pop regA,
-                                 Compute op regA regB regA,
-                                 Push regA]
-                                 where
-                                   (op, exp1, exp2) = getCond cond
--- Helper function to get conver our Condition to something Sprockell can understand
-getCond :: Condition -> (Sprockell.Operator, Expr, Expr)
-getCond (Parser.Lt exp1 exp2) = (Sprockell.Lt, exp1, exp2)
-getCond (Parser.Eq exp1 exp2) = (Sprockell.Equal, exp1, exp2)
-getCond (Parser.Gt exp1 exp2) = (Sprockell.Gt, exp1, exp2)
-getCond (Parser.Lq exp1 exp2) = (Sprockell.LtE, exp1, exp2)
-getCond (Parser.Gq exp1 exp2) = (Sprockell.GtE, exp1, exp2)
 
--- opToOp :: Parser.Op -> Sprockell.Op
--- opToOp (Gt) | Sprockell.Gt
---             | otherwise = "error opToOp"
--- genCond (Gq exp1 exp2) smTable =
--- genCond (Lt exp1 exp2) smTable = gen
--- genCond (Eq exp1 exp2) smTable =
--- genCond (Lt exp1 exp2) smTable =
---
+-- Generate the code for doing a condition with two expressions
+genCond :: Condition -> [DataBase] -> [Instruction]
+genCond (Parser.Lt exp1 exp2) smTable = genTwoExpr (Sprockell.Lt,    exp1, exp2) smTable
+genCond (Parser.Eq exp1 exp2) smTable = genTwoExpr (Sprockell.Equal, exp1, exp2) smTable
+genCond (Parser.Gt exp1 exp2) smTable = genTwoExpr (Sprockell.Gt,    exp1, exp2) smTable
+genCond (Parser.Lq exp1 exp2) smTable = genTwoExpr (Sprockell.LtE,   exp1, exp2) smTable
+genCond (Parser.Gq exp1 exp2) smTable = genTwoExpr (Sprockell.GtE,   exp1, exp2) smTable
+
+-- Generate a calculation of two expressions. Evaluates both expressions and pushes back the result to the stack.
+genTwoExpr :: (Operator, Expr, Expr) -> [DataBase] -> [Instruction]
+genTwoExpr (op, exp1, exp2) smTable = genExpr exp1 smTable ++ genExpr exp2 smTable
+                                      ++ [Pop regB, Pop regA,
+                                         Compute op regA regB regA,
+                                         Push regA]
+
+-- Helper function to convert an boolean to an int
+boolToInt :: Bool -> Int
+boolToInt True  = 1
+boolToInt False = 0
+
+
+-- genCond cond smTable = genExpr exp1 smTable ++ genExpr exp2 smTable
+--                                  ++ [Pop regB, Pop regA,
+--                                  Compute op regA regB regA,
+--                                  Push regA]
+--                                  where
+--                                    (op, exp1, exp2) = getCond cond
+-- -- Helper function to get conver our Condition to something Sprockell can understand
+-- getCond :: Condition -> (Sprockell.Operator, Expr, Expr)
+-- getCond (Parser.Lt exp1 exp2) = (Sprockell.Lt,    exp1, exp2)
+-- getCond (Parser.Eq exp1 exp2) = (Sprockell.Equal, exp1, exp2)
+-- getCond (Parser.Gt exp1 exp2) = (Sprockell.Gt,    exp1, exp2)
+-- getCond (Parser.Lq exp1 exp2) = (Sprockell.LtE,   exp1, exp2)
+-- getCond (Parser.Gq exp1 exp2) = (Sprockell.GtE,   exp1, exp2)
+
+
 -- Get the memory address
 memAddr :: [DataBase] -> String -> [Instruction]
 memAddr smTable varName = [Compute Sprockell.Add regF reg0 regE]
@@ -150,7 +173,7 @@ memAddr smTable varName = [Compute Sprockell.Add regF reg0 regE]
 
 --------- DEBUG REMOVE WHEN DONE!!
 codeGenTest = do
-  result <- parseFromFile parseBlock "examples/whiletest.amv"
+  result <- parseFromFile parseBlock "../examples/whiletest.amv"
   case result of
     Left err -> print err
     Right xs -> do
@@ -192,63 +215,63 @@ codeGenTest = do
   -- EndProg]
 
 
-prog :: [Instruction]
-prog = [ Load (ImmValue 1000) regA,
-         Store regA (DirAddr  0),         -- int jesse = 1000 (@0)
-         Load (ImmValue 1001) regA,
-         Store regA (DirAddr  1),         -- int robert = 1000 (@1)
-
-         Load (DirAddr 0) regA,
-         WriteInstr regA numberIO,
-
-         Load (DirAddr 1) regA,
-         WriteInstr regA numberIO,
-
-         -- Jump ahead to after the function(s)
-
-         -- transfer (jesse, marieke, 100)
-         Sprockell.Nop,  -- transfer
-         Pop regB, --(regA will be return address)
-         Pop regC, -- the from parameter DirAddr   (call by ref)
-         Pop regD, -- the to parameter  DirAddr    (call by ref)
-         Pop regE, -- the amount parameter just imm value
-
-         Load (IndAddr regC) regA, -- FROM: get jesse
-         -- if from >= amount
-         Compute GtE regA regE regA,
-         Branch regA (Rel 1), -- JUMP TO ELSE NOT TO REL 1
-
-         Load (IndAddr regC) regA, -- FROM: get jesse
-         Compute Sub regA regE regA,
-         Store regA (IndAddr regC),
-
-         Load (IndAddr regD) regA,
-         Compute Sprockell.Add regA regE regA,
-         Store regA (IndAddr regD),
-
-
-
-
-
-
-         -- so when I see a function then store my address into
-
-
-
-       -- -- "beginloop"
-       -- , Compute Gt regA regE regC     -- regA > regE ?
-       -- , Branch regC (Abs 13)          -- then jump to target "end"
-       -- , WriteInstr regA numberIO      -- output regA
-       -- , Compute Add regA regB regA
-       -- , Compute Gt regB regE regC     -- regB > regE
-       -- , Branch regC (Abs 13)          -- target "end"
-       -- , WriteInstr regB numberIO      -- output regB
-       -- , Compute Add regA regB regB
-       -- , Jump (Rel (-8))               -- target "beginloop"
-
-       -- "end"
-        EndProg
-       ]
-
--- run the prog on 1 Sprockell core
-cheese = run [prog]
+-- prog :: [Instruction]
+-- prog = [ Load (ImmValue 1000) regA,
+--          Store regA (DirAddr  0),         -- int jesse = 1000 (@0)
+--          Load (ImmValue 1001) regA,
+--          Store regA (DirAddr  1),         -- int robert = 1000 (@1)
+--
+--          Load (DirAddr 0) regA,
+--          WriteInstr regA numberIO,
+--
+--          Load (DirAddr 1) regA,
+--          WriteInstr regA numberIO,
+--
+--          -- Jump ahead to after the function(s)
+--
+--          -- transfer (jesse, marieke, 100)
+--          Sprockell.Nop,  -- transfer
+--          Pop regB, --(regA will be return address)
+--          Pop regC, -- the from parameter DirAddr   (call by ref)
+--          Pop regD, -- the to parameter  DirAddr    (call by ref)
+--          Pop regE, -- the amount parameter just imm value
+--
+--          Load (IndAddr regC) regA, -- FROM: get jesse
+--          -- if from >= amount
+--          Compute GtE regA regE regA,
+--          Branch regA (Rel 1), -- JUMP TO ELSE NOT TO REL 1
+--
+--          Load (IndAddr regC) regA, -- FROM: get jesse
+--          Compute Sub regA regE regA,
+--          Store regA (IndAddr regC),
+--
+--          Load (IndAddr regD) regA,
+--          Compute Sprockell.Add regA regE regA,
+--          Store regA (IndAddr regD),
+--
+--
+--
+--
+--
+--
+--          -- so when I see a function then store my address into
+--
+--
+--
+--        -- -- "beginloop"
+--        -- , Compute Gt regA regE regC     -- regA > regE ?
+--        -- , Branch regC (Abs 13)          -- then jump to target "end"
+--        -- , WriteInstr regA numberIO      -- output regA
+--        -- , Compute Add regA regB regA
+--        -- , Compute Gt regB regE regC     -- regB > regE
+--        -- , Branch regC (Abs 13)          -- target "end"
+--        -- , WriteInstr regB numberIO      -- output regB
+--        -- , Compute Add regA regB regB
+--        -- , Jump (Rel (-8))               -- target "beginloop"
+--
+--        -- "end"
+--         EndProg
+--        ]
+--
+-- -- run the prog on 1 Sprockell core
+-- cheese = run [prog]
