@@ -65,6 +65,7 @@ data Expr = Constant Integer
             | IfExpr Type Condition Expr Expr
             | Paren Expr
             | Min Expr Expr
+            -- | Zero
             deriving (Eq,Show)
 
 data Condition = Lt Expr Expr
@@ -279,7 +280,6 @@ parseCommand_testReturn = parse parseCommand "" "return int ?(x<2) {2}{3};"
 
 
 
-
 parseBlock :: Parser Bloc
 -- parseBlock = Block <$> parseArrayCommands
 -- parseBlock = Block <$> (reserved "{" *> (optional spaces)*> addEnd)
@@ -314,7 +314,8 @@ parseArgTypeVoid = Arg <$>parseVoidType<*>identifier
 parseArgTypeVoid_testvoid = parse parseArgTypeVoid "" "void fib"
 
 parseVarDecl:: Parser Commands
-parseVarDecl = VarDecl <$> parseArgType <*>(reservedOp "=" *> parseExpr)
+parseVarDecl = try (VarDecl <$> parseArgType <*>(reservedOp "=" *> parseExpr))
+            -- <|>  (VarDecl <$> parseArgType <*>0)
 parseVarDecl_test1 = parse parseVarDecl "" "int x = 2;"
 parseVarDecl_test2 = parse parseVarDecl "" "int x = fib(2);"
 
