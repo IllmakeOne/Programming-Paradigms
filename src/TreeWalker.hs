@@ -5,7 +5,7 @@ import Debug.Trace
 import Text.ParserCombinators.Parsec
 import Text.ParserCombinators.Parsec.Language
 import qualified Text.ParserCombinators.Parsec.Token as Token
--- import Data
+import Structure
 
 
 
@@ -21,19 +21,19 @@ import qualified Text.ParserCombinators.Parsec.Token as Token
 data DataBase = DB ArgType Int Int | DBF ArgType [Param]
       deriving (Eq,Show)
 
-fromBlock :: Bloc -> [Commands]
-fromBlock (Block a) =  a
-
 --String to Command List
 fromStCL :: String -> [Commands]
 fromStCL prog =fromBlock$ fromRight (Block [])  (parse parseBlock "" prog)
 
+--this methods is used to get the current offset of a given scope 'x'
 scopesTracker :: [(Int,Int)] ->Int ->Int
 scopesTracker [] _ = error "Could not find offeset of scope"
 scopesTracker ((a,b):xs) x | a == x = b
                            | otherwise = scopesTracker xs x
 scopesTracker_test1 = scopesTracker [(1,0),(2,4)] 2
 
+--this methods is used to increment the offest of a scope 'x'
+--if the scope is not declared yet, declare it with offset 0
 increaseOffset:: [(Int, Int)] -> Int -> [(Int, Int)]
 increaseOffset [] x = [(x,0)]
 increaseOffset ((a,b):xs) x | a == x = (a,(b+1)):xs
@@ -42,9 +42,14 @@ increaseOffset_test1 = increaseOffset [(1,0),(2,4)] 2
 increaseOffset_test2 = increaseOffset [] 2
 
 
+--this methods creates the DataBase/symbol table list
+--  which would be used for type checking and in computing
+-- it's second argument, the int , is the scope in which the method is right now
+-- it's second argument should be initiallized with 1, as 0 is reserved for global varaibles
+-- and it's third argument should just be an empty list
 treeBuilder :: [Commands] -> Int ->[(Int, Int)] -> [DataBase]
 treeBuilder [] _ _ = []
-treeBuilder ((VarDecl arg expr):xs) scope off | checkDuplicant db arg scope && checkDuplicant db arg 0 = add:db
+treeBuilder ((VarDecl arg expr):xs) scope off | checkDuplicant db arg scope = add:db
                                               | otherwise = error "Dupicant declaration in same scope "
     where
       db = treeBuilder xs scope (increaseOffset off scope)
@@ -63,7 +68,12 @@ treeBuilder ((FunDecl arg args bloc):xs) scope off | checkDuplicant db arg scope
       db = treeBuilder xs scope off
       ownscope = treeBuilder (fromBlock bloc) (scope+1) (increaseOffset off (scope+1))
       add = (DBF arg args)
-      ret = exprTypeFromRet args bloc (findRetinBloc $ fromBlock bloc)
+      blocReturn = (findRetinBloc $ fromBlock bloc) --the return command of the method
+      ret | typeArgtype arg == SimplyNull && blocReturn == (Return NullExpr) = SimplyNull
+          | typeArgtype arg == SimplyNull && not (blocReturn == (Return NullExpr)) = error "Void methods has return"
+          | otherwise = exprTypeFromRet (traceShowId (onlyGlobals db)) args bloc blocReturn
+      --ret is the return type of the methods being declared
+
 treeBuilder ((Fork bloc):xs) scope off =
     treeBuilder (fromBlock bloc) (scope+1) off ++ treeBuilder xs scope off
 treeBuilder (x:xs) scope off = treeBuilder xs scope off
@@ -72,13 +82,18 @@ treeBuilder_test1 = treeBuilder
           (fromBlock ( fromRight (Block [])  aux))
           1 []
 aux = parse parseBlock ""
-      "{ func int fib(int x, & int y){ return x;}; int x = fib (ya, 2);}"
+      "{ global int z = 3 ;func int fib(int x, & int y){ int x =2 ;return y;}; int x = fib (ya, 2);func int fibi(int x, & int y){ int x =2 ;return y;};}"
 
+--this methods seraches for the return in a list of commands
+-- used in -> treeBuilder for fundecl for checking if a method has the corret  return type
 findRetinBloc :: [Commands] -> Commands
-findRetinBloc [] = error "Methods with no Return"
+findRetinBloc [] = (Return NullExpr)
 findRetinBloc ((Return expr):xs) = (Return expr)
 findRetinBloc (x:xs) = findRetinBloc xs
 
+--this method adds params by ref to the DataBase,
+--    so if the return of a method calls its byref param it will not error
+-- methods used in -> exprTypeFromRet
 addByrefParamsDb :: [Param] -> Int ->[(Int, Int)]  -> [DataBase]
 addByrefParamsDb [] _ _ = []
 addByrefParamsDb ((ByVal _):ps) scope off = addByrefParamsDb ps scope off
@@ -86,55 +101,68 @@ addByrefParamsDb ((ByRef arg):ps) scope off =
       (DB arg (scopesTracker (increaseOffset off scope) scope) scope):addByrefParamsDb ps scope (increaseOffset off (scope+1))
 addByrefParamsDb_tes1 = addByrefParamsDb [ByVal (Arg SimplyInt "x"),ByRef (Arg SimplyInt "y")] 1 [(0,0)]
 
-exprTypeFromRet ::[Param] ->Bloc -> Commands -> Type
-exprTypeFromRet param bloc (Return expr) =
+--method that puts together the current database and the DB entries of a blok of a methods, and the methods;s parameters
+--methods used in ->  treeBuilder for fundecl for checking if a method has the corret  return type
+exprTypeFromRet ::[DataBase] -> [Param] ->Bloc -> Commands -> Type
+exprTypeFromRet globalDb param bloc (Return expr) =
    typeExpr expr db
    where
      paramdb = addByrefParamsDb param 0 []
      blocdb = treeBuilder (fromBlock bloc) 0 []
-     db = paramdb ++ blocdb
+     db = paramdb ++ blocdb ++ globalDb
 
+--methods taht filters out all the non global variables
+-- used in -> treeBuilder for fundecl for checking if a method has the corret  return type
+onlyGlobals:: [DataBase] -> [DataBase]
+onlyGlobals [] = []
+onlyGlobals ((DB arg 0 off):db) =(DB arg 0 off) : onlyGlobals db
+onlyGlobals (x:db) = onlyGlobals db
+-- onlyGlobals_test1 =
 
-
+--helped method that return the scope and offset of a varaibles based on its name
+-- not used anywhere at the moment of writing this comment
 getOffset :: [DataBase] -> String -> (Int, Int)
 getOffset [] _ = error "getOffset error"
 getOffset (DB (Arg argType argName) x y:xs) name
       | argName == name = (x, y)
       | otherwise = getOffset xs name
--- getOffset (DBF fname params) name
---       -- | stringArtgType name == stringArtgType arg = False
---       | otherwise = getOffset params name
 
-getOffsetTest = getOffset treeBuilder_test1 "b"
 
+--this methods checks if a variable/method has been declared before
+--variables are compared to varaibles withing the same scope and with global variables
+-- global variables are compared just wiht other global varaibles
 checkDuplicant :: [DataBase]-> ArgType ->Int -> Bool
 checkDuplicant [] _ _ = True
 checkDuplicant (( DB dbarg sco _):xs) arg scope
       | scope == sco && stringArtgType dbarg == stringArtgType arg = False
+      | 0 == sco && stringArtgType dbarg == stringArtgType arg = error "Var with same name as global variable"
       | otherwise = checkDuplicant xs arg scope
 checkDuplicant ((DBF name params ):xs) arg scope
       | stringArtgType name == stringArtgType arg = False
       | otherwise = checkDuplicant xs arg scope
 
 
-
-
 --------------------------------TypeChecking-------------------------------------
 
-
+-- main typeChekcr metods, takes a list of commands and the symbol table
+-- returns true if all types are correct and throws exceptions for wrong types
 typeCheckProgram :: [Commands] -> [DataBase] -> Bool
 typeCheckProgram (x:prog) db  | typeCheck db x = typeCheckProgram prog db
                               | otherwise = error "Tyepe chekcpr porgram eror somehow"
 typeCheckProgram [] _ = True
+
 typeCheckProgram_test stg =
   typeCheckProgram (fromStCL stg) (treeBuilder (fromStCL stg) 1 [])
+
 typeCheckProgram_test1 = typeCheckProgram_test "{ int x = 0; int y = 2; int z = x+y; print x;}"
 typeCheckProgram_test2 = typeCheckProgram_test "{ int x = 0; int y = 2; int z = ya; print x;}"
 typeCheckProgram_test3 = typeCheckProgram_test "{ func int fib(int x,& int y){}; int x = fib (2, 2);}"
 typeCheckProgram_test4 = typeCheckProgram_test "{ func int fib(int x,& int y){return 0}; int x = fib (2, nu);}"
 
 
-
+--this metiods check is an individial command has the correct type
+-- returns true if the types are correct and throws an error for different reasons
+-- used in -> typeCheckProgram
 typeCheck :: [DataBase] -> Commands -> Bool
 typeCheck db (VarDecl typ ex) | typeArgtype typ == typeExpr ex db = True
                               | otherwise = error "Type error in type declarations"
@@ -155,20 +183,6 @@ typeCheck db (MinCom name ex) | findinDb name db == typeExpr ex db = True
 typeCheck _ _ = True
 
 
-
-typeArgtype:: ArgType -> Type
-typeArgtype (Arg t _ ) = t
-
-findinDb:: String -> [DataBase] -> Type
-findinDb name ((DB  arg _ _):dbx) | name == stringArtgType arg = typeArgtype arg
-                                  | otherwise = findinDb name dbx
-findinDb name ((DBF  arg  _):dbx) | name == stringArtgType arg = typeArgtype arg
-                                  | otherwise = findinDb name dbx
-findinDb _ [] = error "undeclared variable called"
-
-
-stringArtgType :: ArgType ->  String
-stringArtgType (Arg _ x ) = x
 
 typeExpr :: Expr -> [DataBase]-> Type
 typeExpr (Constant _ ) db = SimplyInt
@@ -196,6 +210,18 @@ typeExpr (IfExpr typ _ _ _ ) db = typ
 typeExpr (Identifier x ) db = findinDb x db
 typeExpr fun@(Funct name exprs) db | checkCorrectFuncExpr db fun = findinDb name db
                                    | otherwise = error "Function's arguments are not correct in FuncExpr"
+
+--this methods looks in the database for a namse and returns its type
+-- used in determining a exprssion's type -> typeExpr
+findinDb:: String -> [DataBase] -> Type
+findinDb name ((DB  arg _ _):dbx) | name == stringArtgType arg = typeArgtype arg
+                                  | otherwise = findinDb name dbx
+findinDb name ((DBF  arg  _):dbx) | name == stringArtgType arg = typeArgtype arg
+                                  | otherwise = findinDb name dbx
+findinDb _ [] = error "undeclared variable called"
+
+
+
 
 typeCheckCondition :: Condition -> [DataBase] -> Bool
 typeCheckCondition (Lt e1 e2)  db = typeExpr e1 db == typeExpr e2 db
