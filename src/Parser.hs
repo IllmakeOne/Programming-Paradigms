@@ -228,6 +228,8 @@ parseType_testint = parse parseType "" "int"
 
 parseVoidType :: Parser Type
 parseVoidType = try (reserved "void"  >> return SimplyNull )
+          <|> try (reserved "bool"  >> return SimplyBol )
+          <|> try (reserved "int"  >> return SimplyInt )
 parseVoidType_test = parse parseVoidType "" "void"
 
 
@@ -367,11 +369,10 @@ parsePrint_test1 = parse parsePrint "" "print 2;"
 parsePrint_test2 = parse parsePrint "" "print ?(2<x){2+x}{2+3};"
 
 parseFunDecl :: Parser Commands
-parseFunDecl = try (FunDecl <$> (reserved "func" *> parseArgType)
+parseFunDecl = try (FunDecl <$> (reserved "func" *> parseArgTypeVoid)
                     <*> parens params <*>parseBlock)
-              <|> FunDecl <$> (reserved "func" *> parseArgTypeVoid)
-                                  <*> parens params <*>parseBlock
-parseFunDecl_test1 = parse parseFunDecl "" "func int theStuff(int a, bool b){int x = a;}"
+parseFunDecl_test1 = parse parseFunDecl "" "func int theStuff(int a, bool b){ int x = a;}"
+parseFunDecl_test2 = parse parseFunDecl "" "func void theStuff(int a, bool b){ int x = a;}"
 
 parseParam:: Parser Param
 parseParam = try (ByRef <$> (reserved "&" *>parseArgType))

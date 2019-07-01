@@ -42,8 +42,6 @@ increaseOffset_test1 = increaseOffset [(1,0),(2,4)] 2
 increaseOffset_test2 = increaseOffset [] 2
 
 
-
-
 treeBuilder :: [Commands] -> Int ->[(Int, Int)] -> [DataBase]
 treeBuilder [] _ _ = []
 treeBuilder ((VarDecl arg expr):xs) scope off | checkDuplicant db arg scope && checkDuplicant db arg 0 = add:db
@@ -59,28 +57,44 @@ treeBuilder ((GlobalVarDecl arg expr):xs) scope off | checkDuplicant db arg 0 = 
         -- (DB arg 0 (scopesTracker off scope)): treeBuilder xs scope (increaseOffset off scope)
 
 treeBuilder ((FunDecl arg args bloc):xs) scope off | checkDuplicant db arg scope && typeArgtype arg == ret = add:ownscope ++ db
-                                                   | otherwise = error "Dupicant Method in program "
+                                                   | typeArgtype arg == ret = error "Dupicant Method in program "
+                                                   | otherwise = error "Return type of methods not same type ans methods type "
     where
       db = treeBuilder xs scope off
       ownscope = treeBuilder (fromBlock bloc) (scope+1) (increaseOffset off (scope+1))
       add = (DBF arg args)
-      ret = exprTypeFromRet $ findRetinBloc $ fromBlock bloc
+      ret = exprTypeFromRet args bloc (findRetinBloc $ fromBlock bloc)
 treeBuilder ((Fork bloc):xs) scope off =
     treeBuilder (fromBlock bloc) (scope+1) off ++ treeBuilder xs scope off
 treeBuilder (x:xs) scope off = treeBuilder xs scope off
-
-findRetinBloc :: [Commands] -> Commands
-findRetinBloc ((Return expr):xs) = (Return expr)
-findRetinBloc (x:xs) = findRetinBloc xs
-
-exprTypeFromRet :: [DataBase] -> Commands -> Type
-exprTypeFromRet db (Return expr) = typeExpr expr db
 
 treeBuilder_test1 = treeBuilder
           (fromBlock ( fromRight (Block [])  aux))
           1 []
 aux = parse parseBlock ""
-      "{ func int fib(int x, & int y){}; int x = fib (ya, 2);}"
+      "{ func int fib(int x, & int y){ return x;}; int x = fib (ya, 2);}"
+
+findRetinBloc :: [Commands] -> Commands
+findRetinBloc [] = error "Methods with no Return"
+findRetinBloc ((Return expr):xs) = (Return expr)
+findRetinBloc (x:xs) = findRetinBloc xs
+
+addByrefParamsDb :: [Param] -> Int ->[(Int, Int)]  -> [DataBase]
+addByrefParamsDb [] _ _ = []
+addByrefParamsDb ((ByVal _):ps) scope off = addByrefParamsDb ps scope off
+addByrefParamsDb ((ByRef arg):ps) scope off =
+      (DB arg (scopesTracker (increaseOffset off scope) scope) scope):addByrefParamsDb ps scope (increaseOffset off (scope+1))
+addByrefParamsDb_tes1 = addByrefParamsDb [ByVal (Arg SimplyInt "x"),ByRef (Arg SimplyInt "y")] 1 [(0,0)]
+
+exprTypeFromRet ::[Param] ->Bloc -> Commands -> Type
+exprTypeFromRet param bloc (Return expr) =
+   typeExpr expr db
+   where
+     paramdb = addByrefParamsDb param 0 []
+     blocdb = treeBuilder (fromBlock bloc) 0 []
+     db = paramdb ++ blocdb
+
+
 
 getOffset :: [DataBase] -> String -> (Int, Int)
 getOffset [] _ = error "getOffset error"
@@ -117,7 +131,7 @@ typeCheckProgram_test stg =
 typeCheckProgram_test1 = typeCheckProgram_test "{ int x = 0; int y = 2; int z = x+y; print x;}"
 typeCheckProgram_test2 = typeCheckProgram_test "{ int x = 0; int y = 2; int z = ya; print x;}"
 typeCheckProgram_test3 = typeCheckProgram_test "{ func int fib(int x,& int y){}; int x = fib (2, 2);}"
-typeCheckProgram_test4 = typeCheckProgram_test "{ func int fib(int x,& int y){}; int x = fib (2, nu);}"
+typeCheckProgram_test4 = typeCheckProgram_test "{ func int fib(int x,& int y){return 0}; int x = fib (2, nu);}"
 
 
 
