@@ -144,7 +144,7 @@ checkDuplicant ((DBF name params ):xs) arg scope
 
 --------------------------------TypeChecking-------------------------------------
 
--- main typeChekcr metods, takes a list of commands and the symbol table
+-- main type checking metods, takes a list of commands and the symbol table
 -- returns true if all types are correct and throws exceptions for wrong types
 typeCheckProgram :: [Commands] -> [DataBase] -> Bool
 typeCheckProgram (x:prog) db  | typeCheck db x = typeCheckProgram prog db
@@ -180,10 +180,16 @@ typeCheck db (AddCom name ex) | findinDb name db == typeExpr ex db = True
                               | otherwise = error "Type error in add command += "
 typeCheck db (MinCom name ex) | findinDb name db == typeExpr ex db = True
                               | otherwise = error "Type error in minus commdn -= "
+typeCheck db (While cond _) | typeCheckCondition cond db = True
+                          | otherwise = error "Cond var not the same type in While"
+typeCheck db (IfCom cond _ _) | typeCheckCondition cond db = True
+                              | otherwise = error "Cond var not the same type in IfCom"
 typeCheck _ _ = True
 
 
-
+-- this methdos takes and expression and the database and returns the expression's type
+-- used in -> typeCheck, exprTypeFromRet, typeCheckCondition
+-- if the exprssions withing the argument expresson are wrong, an appropriete error message will arise
 typeExpr :: Expr -> [DataBase]-> Type
 typeExpr (Constant _ ) db = SimplyInt
 typeExpr (BoolConst _ ) db = SimplyBol
@@ -206,10 +212,12 @@ typeExpr (Min e1 e2 ) db | not (t1 == t2) = error "Substractions elemets are not
         where
           t1 = typeExpr e1 db
           t2 = typeExpr e2 db
-typeExpr (IfExpr typ _ _ _ ) db = typ
+typeExpr (IfExpr typ cond _ _ ) db | typeCheckCondition cond db = typ
+                                   | otherwise = error "Condition types not the same in IfExpr"
 typeExpr (Identifier x ) db = findinDb x db
 typeExpr fun@(Funct name exprs) db | checkCorrectFuncExpr db fun = findinDb name db
                                    | otherwise = error "Function's arguments are not correct in FuncExpr"
+
 
 --this methods looks in the database for a namse and returns its type
 -- used in determining a exprssion's type -> typeExpr
@@ -221,8 +229,8 @@ findinDb name ((DBF  arg  _):dbx) | name == stringArtgType arg = typeArgtype arg
 findinDb _ [] = error "undeclared variable called"
 
 
-
-
+--checks if the expression in a condition are the same type
+-- returns true if they are and false if they are no the same type
 typeCheckCondition :: Condition -> [DataBase] -> Bool
 typeCheckCondition (Lt e1 e2)  db = typeExpr e1 db == typeExpr e2 db
 typeCheckCondition (Eq e1 e2)  db = typeExpr e1 db == typeExpr e2 db
