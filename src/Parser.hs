@@ -62,7 +62,7 @@ data Expr = Constant Integer -- DONE IMPLEMENTED IN GENERATOR
             | Mult Expr Expr -- DONE IMPLEMENTED
             | Add Expr Expr -- DONE IMPLEMENTED
             | Funct String [Expr]
-            | IfExpr Type Condition Expr Expr -- inline if statement
+            | IfExpr Type Condition Expr Expr -- inline if statement -- DONE IMPLEMENTED
             | Paren Expr    -- DONE IMPLEMENTED
             | Min Expr Expr -- DONE IMPLEMENTED
             deriving (Eq,Show)

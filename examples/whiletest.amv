@@ -3,7 +3,8 @@ int jesse = (3+4)*2-2*2; // 10
 while (jesse > 0) {
   print jesse;
   // Works also: jesse--;
-  jesse -= 5;
+  jesse--;
+  //jesse -= 5;
 };
 print jesse;
 }
