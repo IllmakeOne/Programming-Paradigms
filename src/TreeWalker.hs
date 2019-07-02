@@ -137,7 +137,7 @@ checkDuplicant (( DB dbarg sco _):xs) arg scope
       | scope == sco && stringArtgType dbarg == stringArtgType arg = False
       | 0 == sco && stringArtgType dbarg == stringArtgType arg = error "Var with same name as global variable"
       | otherwise = checkDuplicant xs arg scope
-checkDuplicant ((DBF name params _ ):xs) arg scope
+checkDuplicant ((DBF name params _):xs) arg scope
       | stringArtgType name == stringArtgType arg = False
       | otherwise = checkDuplicant xs arg scope
 

@@ -106,11 +106,6 @@ parsefactor_testIdent = parse parseFactor "" "x"
 parsefactor_testFunct = parse parseFactor "" "fib(2,3,ya)"
 parsefactor_testIfexpr = parse parseFactor "" "int ?(2<x){2+x}{2+3}"
 
-
-
-
-
-
 ----------------------------------------------------------------------------------
 -----------------------Parse Commands----------------------------------------------
 

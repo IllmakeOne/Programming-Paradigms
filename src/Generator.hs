@@ -3,10 +3,10 @@ module Generator where
 import Sprockell
 import Parser
 import TreeWalker
+import Structure
 import Text.Parsec.String
 import Data.Maybe
-import Structure
-
+import Debug.Trace
 --Block [VarDecl (Arg SimplyInt "jesse") (Constant 1000),
 -- GlobalVarDecl (Arg SimplyInt "robert") (Constant 1000),
 -- VarDecl (Arg SimplyInt "marieke") (Constant 5000),FunDecl (Arg SimplyInt "transfer") [ByRef (Arg SimplyInt "from"),ByRef (Arg SimplyInt "to"),ByVal (Arg SimplyInt "amount")] (Block [IfCom (Gq (Identifier "from") (Identifier "amount")) (Block [MinCom "from" (Identifier "amount"),AddCom "to" (Identifier "amount"),End]) (Block [End]),End]),FunDecl (Arg SimplyNull "helicopterMoney") [ByVal (Arg SimplyInt "to"),ByVal (Arg SimplyInt "amount")] (Block [AddCom "to" (Identifier "amount"),While (Lt (Identifier "to") (Identifier "robert")) (Block [AddCom "to" (Identifier "amount"),End]),End]),Fork (Block [FunCall "helicopterMoney" [Identifier "jesse",Constant 9000],End]
@@ -24,22 +24,33 @@ generation xs = genBlock commands smTable ++ [EndProg]
 
 genBlock :: [Commands] -> [DataBase] -> [Instruction]
 genBlock [] _ = []
-genBlock (x:xs) smTable = gen x smTable ++ genBlock xs smTable
+-- Here span funcdecl commands
+genBlock commands smTable = (traceShow smTable) [Sprockell.Nop] -- gen x smTable ++ genBlock xs smTable
+  where
+    (functions, main) = span isFunction commands
+
+
+isFunction :: Commands -> Bool
+isFunction (FunDecl _ _ _) = True
+isFunction _ = False
+
+
+-- ALSO OPEN A NEW SCOPE!!!
 
 
 gen :: Commands -> [DataBase] -> [Instruction]
 -- Generate end
 gen End _ = []
-gen Parser.Nop _ = [Sprockell.Nop]
+gen Structure.Nop _ = [Sprockell.Nop]
 -- Generate a variable
-gen (VarDecl (Arg varType name) expr) smTable = genVar name expr smTable -- genExpr expr smTable ++ -- pop that expression into regD
+gen (VarDecl (Arg varType name) expr) smTable = genVar name expr Nothing smTable -- genExpr expr smTable ++ -- pop that expression into regD
 --                                    memAddr smTable name ++ -- eddress is in regE
 --                                    [Pop regD, Store regD (IndAddr regE)]
                                    -- [Load (IndAddr regE) regD, -- pop anythingg left in regD
                                    -- Push regD] -- store val in regE in regD
                                    -- Generate an (re-)assignment of a variable
 -- Generate a (re)assignment of a variable it's same as above
-gen (Ass varName expr) smTable = genVar varName expr smTable
+gen (Ass varName expr) smTable = genVar varName expr Nothing smTable
 
 -- Generate a print method
 gen (Print expr) smTable = genExpr expr smTable ++
@@ -70,75 +81,147 @@ gen (While cond block) smTable
     lengthWhileBody = length genWhileBody
 
 -- Generate code for decreasing a value
-gen (Parser.Decr varName) smTable
-  = memAddr smTable varName -- eddress is in regE
-  ++ [Load (IndAddr regE) regD -- store the actual value in regD
-      , Compute Sprockell.Decr regD regD regD
-      , Store regD (IndAddr regE)] -- store back in regE again
-
+gen (Structure.Decr varName) smTable = incrDecrVar varName Sprockell.Decr smTable
 -- Generate code for increasing a value
-gen (Parser.Incr varName) smTable
-  = memAddr smTable varName -- eddress is in regE
-  ++ [Load (IndAddr regE) regD -- store the actual value in regD
-      , Compute Sprockell.Incr regD regD regD
-      , Store regD (IndAddr regE)] -- store back in regE again
+gen (Structure.Incr varName) smTable = incrDecrVar varName Sprockell.Incr smTable
 -- Generate code for += statements
-gen (AddCom varName expr) smTable =
-  genExpr expr smTable -- pop the result in regD
-  ++ memAddr smTable varName -- eddress is in regE
-  ++ [Pop regD -- pop the genExpr in regD
-      , Load (IndAddr regE) regA -- load the value of the address in regA
-      , Compute Sprockell.Add regA regD regA -- add that stuff to regA
-      , Store regA (IndAddr regE)] -- store regA back in regE
-
+gen (AddCom varName expr) smTable = genVar varName expr (Just Sprockell.Add) smTable
 -- Same as before, Generate code for -= statements
-gen (MinCom varName expr) smTable =
-  genExpr expr smTable -- pop the result in regD
-  ++ memAddr smTable varName -- eddress is in regE
-  ++ [Pop regD -- pop the genExpr in regD
-      , Load (IndAddr regE) regA -- load the value of the address in regA
-      , Compute Sub regA regD regA -- add that stuff to regA
-      , Store regA (IndAddr regE)] -- store regA back in regE
+gen (MinCom varName expr) smTable = genVar varName expr (Just Sprockell.Sub) smTable
 
+-- Generate a function declaration
+-- gen (FunDecl fType params body) smTable =
+--   -- First jump over it, as we don't want to evaluate it immideatly but store the location in main memory.
+--   [Jump (Rel (length funcDeclGen + 1)), Load (Push (Rel 0)] ++ funcDeclGen
+--   where
+--     funcDeclGen = []
+    -- Function declarations need to be at a fixed spot, so you know where to return to.
 
+    --[Debug "FuncDecl", Load (ImmValue (1 + 3 * length params)) regA, -- 1. TODO IS 3 a good choice?
+    --    Compute Sub regF regA regA, -- 2. set the value of the ARP
+    --    Load (IndAddr reg0) regD, -- 3. amount of parameters already passed down
+    --
+    --    ComputeI Sprockell.Gt regD (length params ) regE, -- 4.  LOOP check if all parameters are passed
+    --    Branch regE (Rel 7), -- 5. then skip this parameter loading below
+    --
+    --    Load (IndAddr regA) regB, -- 6. Load the actual parameter value
+    --    Compute Sprockell.Add regF regD regE, -- 7. Store the address in the local data
+    --    Store regB (IndAddr regE), -- 8.
+    --    Compute Sprockell.Incr regD regD regD, -- 9.
+    --    ComputeI Sprockell.Add regA 3 regA, -- 10.
+    --
+    --    Jump (Rel (-7))] -- 11. go back to  LOOP
+    --    ++ genBlock (fromBlock body) smTable
 
-genVar :: String -> Expr -> [DataBase] -> [Instruction]
-genVar name expr smTable = genExpr expr smTable  -- Pop that into regD
+       -- ++ [Load (ImmValue (1 - 1 + 3 * length params)) regA,
+       --     Compute Sub regF regA regA,
+       --     ComputeI Sprockell.Add reg0 1 regD,
+       --
+       --     ComputeI Sprockell.Gt regD (length params) regE, -- LOOP
+       --     Branch regE (Rel 23), -- then jump over this shit
+       --     Compute Sprockell.Add regF regD regE,
+       --     Load (IndAddr regE) regC,
+       --     Load (IndAddr regA) regB,
+       --     Compute Sprockell.Lt regB reg0 regE, -- check if it is correct
+       --     Branch regE (Rel 2),
+       --     Store regC (IndAddr regB), -- then save in address
+       --     Compute Sprockell.Incr regA reg0 regA, -- move pointr to global
+       --     Branch regE (Rel 10),
+       --
+       --     Compute Sprockell.Add regB reg0 regE, -- lock address
+       --     TestAndSet (IndAddr regE),
+       --     Receive regE,
+       --     Branch regE (Rel 2), -- go back if lock fails
+       --     Jump (Rel (-4)),
+       --     ComputeI Sprockell.Add regB 1 regB,
+       --
+       --     WriteInstr regC (IndAddr regB),
+       --     ComputeI Sub regB 1 regB, --Unlock
+       --     Compute Sprockell.Incr  regD regD regD, --add one to D
+       --     ComputeI Sprockell.Add regA 2 regA,
+       --     Jump (Rel (-23)), -- Go back to the LOOP
+       --
+       --     Compute Sprockell.Decr regF reg0 regA,
+       --     Load (IndAddr regA) regE, -- get the return address
+       --     Load (IndAddr regF) regF, -- restore arp
+       --     Jump (Ind regE)] -- jump to da return address
+-- gen (FunCall funcName expressions) =
+--   [Compute Add regF ]
+
+-- Generate a value with an expression, and maybe an additional calculation
+genVar :: String -> Expr -> Maybe Operator -> [DataBase] -> [Instruction]
+genVar name expr op smTable = genExpr expr smTable  -- Pop that into regD
                            ++ memAddr smTable name -- edress is in regE
-                           ++ [Pop regD, Store regD (IndAddr regE)]
+                           ++ [Pop regD]
+                           ++ genVarCompute op
+                           ++ [Store regD (IndAddr regE)]
+
+-- Do we want to compute something with the variable? This helper function will
+-- find out.
+genVarCompute :: Maybe Operator -> [Instruction]
+genVarCompute Nothing = []
+genVarCompute (Just op) = [Load (IndAddr regE) regA, -- load the value of the address in regA
+                           Compute op regA regD regD] -- Store the evaluation in regD
+
+-- Function to just get the value from memory and increase/ decrease based on
+-- the operator. The caller of this function has to make sure to only use Incr/ Decr.
+incrDecrVar :: String -> Operator -> [DataBase] -> [Instruction]
+incrDecrVar varName op smTable = memAddr smTable varName -- eddress is in regE
+                                 ++ [Load (IndAddr regE) regD -- store the actual value in regD
+                                    , Compute op regD regD regD
+                                    , Store regD (IndAddr regE)] -- store back in regE again
 
 genExpr :: Expr -> [DataBase] -> [Instruction]
 -- Generate constant
 genExpr (Constant i) smTable = [Load (ImmValue (fromInteger i)) regE, Push regE]
+-- Generate a boolean
+genExpr (BoolConst bool) smTable = [Load (ImmValue (boolToInt bool)) regE, Push regE]
+-- Generate the parens, just evaluate the expr in between it
+genExpr (Paren expr) smTable = genExpr expr smTable
 -- Generate a reference
 genExpr (Identifier name) smTable = memAddr smTable name
                                     ++ [Load (IndAddr regE) regD, Push regD]
+-- Generate a calculation of two expressions
+genExpr (Structure.Mult exp1 exp2) smTable = genTwoExpr (Sprockell.Mul, exp1, exp2) smTable
+genExpr (Structure.Add exp1 exp2) smTable  = genTwoExpr (Sprockell.Add, exp1, exp2) smTable
+genExpr (Structure.Min exp1 exp2) smTable  = genTwoExpr (Sprockell.Sub, exp1, exp2) smTable
+
+-- Generate an inline if statement
+-- It's the same as if statement above but now with expressions instead of blocks.
+genExpr (IfExpr _ cond exp1 exp2) smTable =
+  genCond cond smTable
+  ++ [Pop regC,
+      ComputeI Xor regC 1 regC, -- Branch is implemented stupidly so we need to xor (negate) it
+      Branch regC (Rel (length genExp1 + 2)) -- plus two to also skip the branch over the else statement
+  ] ++ genExp1 ++ [Jump (Rel (length genExp2 + 1))] ++ genExp2
+  where
+    genExp1 = genExpr exp1 smTable
+    genExp2 = genExpr exp2 smTable
+-- Else error out
 genExpr _ smTable = error "genExpr error"
 
--- Evaluates both expressions and pushes back the result to the stack.
-genCond :: Condition -> [DataBase] -> [Instruction]
-genCond cond smTable = genExpr exp1 smTable ++ genExpr exp2 smTable
-                                 ++ [Pop regB, Pop regA,
-                                 Compute op regA regB regA,
-                                 Push regA]
-                                 where
-                                   (op, exp1, exp2) = getCond cond
--- Helper function to get conver our Condition to something Sprockell can understand
-getCond :: Condition -> (Sprockell.Operator, Expr, Expr)
-getCond (Parser.Lt exp1 exp2) = (Sprockell.Lt, exp1, exp2)
-getCond (Parser.Eq exp1 exp2) = (Sprockell.Equal, exp1, exp2)
-getCond (Parser.Gt exp1 exp2) = (Sprockell.Gt, exp1, exp2)
-getCond (Parser.Lq exp1 exp2) = (Sprockell.LtE, exp1, exp2)
-getCond (Parser.Gq exp1 exp2) = (Sprockell.GtE, exp1, exp2)
 
--- opToOp :: Parser.Op -> Sprockell.Op
--- opToOp (Gt) | Sprockell.Gt
---             | otherwise = "error opToOp"
--- genCond (Gq exp1 exp2) smTable =
--- genCond (Lt exp1 exp2) smTable = gen
--- genCond (Eq exp1 exp2) smTable =
--- genCond (Lt exp1 exp2) smTable =
---
+-- Generate the code for doing a condition with two expressions
+genCond :: Condition -> [DataBase] -> [Instruction]
+genCond (Structure.Lt exp1 exp2) smTable = genTwoExpr (Sprockell.Lt,    exp1, exp2) smTable
+genCond (Structure.Eq exp1 exp2) smTable = genTwoExpr (Sprockell.Equal, exp1, exp2) smTable
+genCond (Structure.Gt exp1 exp2) smTable = genTwoExpr (Sprockell.Gt,    exp1, exp2) smTable
+genCond (Structure.Lq exp1 exp2) smTable = genTwoExpr (Sprockell.LtE,   exp1, exp2) smTable
+genCond (Structure.Gq exp1 exp2) smTable = genTwoExpr (Sprockell.GtE,   exp1, exp2) smTable
+
+-- Generate a calculation of two expressions. Evaluates both expressions and pushes back the result to the stack.
+genTwoExpr :: (Operator, Expr, Expr) -> [DataBase] -> [Instruction]
+genTwoExpr (op, exp1, exp2) smTable = genExpr exp1 smTable ++ genExpr exp2 smTable
+                                      ++ [Pop regB, Pop regA,
+                                         Compute op regA regB regA,
+                                         Push regA]
+
+-- Helper function to convert an boolean to an int
+boolToInt :: Bool -> Int
+boolToInt True  = 1
+boolToInt False = 0
+
+
 -- Get the memory address
 memAddr :: [DataBase] -> String -> [Instruction]
 memAddr smTable varName = [Compute Sprockell.Add regF reg0 regE]
@@ -151,105 +234,28 @@ memAddr smTable varName = [Compute Sprockell.Add regF reg0 regE]
 
 --------- DEBUG REMOVE WHEN DONE!!
 codeGenTest = do
-  result <- parseFromFile parseBlock "examples/whiletest.amv"
+  result <- parseFromFile parseBlock "../examples/functest.amv"
   case result of
     Left err -> print err
     Right xs -> do
       print code
-      run [code]
+      -- run [code]
       where
         code = generation xs
 
--- koekje = [[Load (ImmValue 9999) 6,
--- Push 6,
--- Compute Add 7 0 6,
--- ComputeI Add 6 1 6,
--- Pop 5,
--- Store 5 (IndAddr 6),
--- Compute Add 7 0 6,
--- ComputeI Add 6 1 6,Load (IndAddr 6) 5,Push 5,Pop 6,WriteInstr 6 (DirAddr 65536), -- print marieke 1
--- Compute Add 7 0 6,ComputeI Add 6 1 6,Load (IndAddr 6) 5,Push 5,Load (ImmValue 9000) 6,Push 6,Pop 3,Pop 2,Compute Lt 2 3 2,
--- Push 2,Pop 4,Branch 4 (Rel 6), -- 6 VERY IMPORTANT
--- Compute Add 7 0 6, -- 1
--- ComputeI Add 6 1 6, -- 2
--- Load (IndAddr 6) 5, -- 3
--- Push 5, -- 4
--- Pop 6, --5
--- WriteInstr 6 (DirAddr 65536), --6
--- Compute Add 7 0 6,ComputeI Add 6 1 6,Load (IndAddr 6) 5,Push 5,Pop 6,WriteInstr 6 (DirAddr 65536),EndProg]]
+showLocalMem :: DbgInput -> String
+showLocalMem ( _ , systemState ) = show $ localMem $ head $ sprStates systemState
 
-  -- [Load (ImmValue 1000) 6,
-  -- Push 6,
-  -- Compute Add 7 0 6,
-  -- ComputeI Add 6 1 6,
-  -- Load (IndAddr 6) 5,
-  -- Push 5,
-  -- Compute Add 7 0 6,
-  -- ComputeI Add 6 1 6,
-  -- Pop 5,
-  -- Store 5 (IndAddr 6),
-  -- Pop 6,
-  -- WriteInstr 6 (DirAddr 65536),
-  -- EndProg]
-
-
-prog :: [Instruction]
-prog = [ Load (ImmValue 1000) regA,
-         Store regA (DirAddr  0),         -- int jesse = 1000 (@0)
-         Load (ImmValue 1001) regA,
-         Store regA (DirAddr  1),         -- int robert = 1000 (@1)
-
-         Load (DirAddr 0) regA,
-         WriteInstr regA numberIO,
-
-         Load (DirAddr 1) regA,
-         WriteInstr regA numberIO,
-
-         -- Jump ahead to after the function(s)
-
-         -- transfer (jesse, marieke, 100)
-         Sprockell.Nop,  -- transfer
-         Pop regB, --(regA will be return address)
-         Pop regC, -- the from parameter DirAddr   (call by ref)
-         Pop regD, -- the to parameter  DirAddr    (call by ref)
-         Pop regE, -- the amount parameter just imm value
-
-         Load (IndAddr regC) regA, -- FROM: get jesse
-         -- if from >= amount
-         Compute GtE regA regE regA,
-         Branch regA (Rel 1), -- JUMP TO ELSE NOT TO REL 1
-
-         Load (IndAddr regC) regA, -- FROM: get jesse
-         Compute Sub regA regE regA,
-         Store regA (IndAddr regC),
-
-         Load (IndAddr regD) regA,
-         Compute Sprockell.Add regA regE regA,
-         Store regA (IndAddr regD),
-
-
-
-
-
-
-         -- so when I see a function then store my address into
-
-
-
-       -- -- "beginloop"
-       -- , Compute Gt regA regE regC     -- regA > regE ?
-       -- , Branch regC (Abs 13)          -- then jump to target "end"
-       -- , WriteInstr regA numberIO      -- output regA
-       -- , Compute Add regA regB regA
-       -- , Compute Gt regB regE regC     -- regB > regE
-       -- , Branch regC (Abs 13)          -- target "end"
-       -- , WriteInstr regB numberIO      -- output regB
-       -- , Compute Add regA regB regB
-       -- , Jump (Rel (-8))               -- target "beginloop"
-
-       -- "end"
-        EndProg
-       ]
-
--- run the prog on 1 Sprockell core
-cheese = run [prog]
+-- koekje = [Load (ImmValue 1000) 6,
+-- Push 6,Compute Add 7 0 6,ComputeI Add 6 1 6,Pop 5,Store 5 (IndAddr 6),
+-- Debug "FuncCall",
+-- Load (ImmValue 4) 2,
+-- Compute Sub 7 2 2,
+-- Load (ImmValue 1) 5,
+-- ComputeI Gt 5 1 6,
+-- Branch 6 (Rel 7),
+-- Load (IndAddr 2) 3,
+-- Compute Add 7 5 6,
+-- Store 3 (IndAddr 6),
+-- Compute Incr 5 5 5,ComputeI Add 2 3 2,Jump (Rel (-7)),
+-- Load (ImmValue 3) 6,Push 6,Compute Add 7 0 6,ComputeI Add 6 1 6,Pop 5,Load (IndAddr 6) 2,Compute Add 2 5 5,Store 5 (IndAddr 6),Compute Add 7 0 6,ComputeI Add 6 1 6,Load (IndAddr 6) 5,Push 5,Pop 6,WriteInstr 6 (DirAddr 65536),EndProg]
