@@ -74,6 +74,10 @@ parseType = try (reserved "bool"  >> return SimplyBol )
 parseType_testbool = parse parseType "" "bool"
 parseType_testint = parse parseType "" "int"
 
+
+parseIntType = try (reserved "int"  >> return SimplyInt )
+parseBoolType = try (reserved "bool"  >> return SimplyBol )
+
 --parses all types as this methods is used for parsing function declarations
 -- it is able to parse void too
 parseVoidType :: Parser Type
@@ -88,18 +92,19 @@ parseIfExpr = IfExpr <$> parseType <*>(reserved "?" *> parens parseCondition)
           <*> braces parseExpr
           <*> braces parseExpr
 parseIfexpr_tesst1 = parse parseIfExpr "" "int ?(2==2){2+1}{2}"
--- parseIfexpr_tesst2 = parse parseIfExpr "" "bool ?(2==2){nu}{ya}"
+parseIfexpr_tesst2 = parse parseIfExpr "" "bool ?(2==2){nu}{ya}"
 
 parseFactor :: Parser Expr
 parseFactor = try (Constant <$> integer)
       <|> try parseIfExpr
-      <|> try (Funct <$> identifier<*> parens arguments) --sepBy parseExpr comma )) -- Should be cool to use: commaSep
+      <|> try (Funct <$> identifier<*> parens arguments)
       <|> try (Paren <$> parens parseExpr)
       <|> try (Identifier <$> identifier)
 
 parsefactor_testCosnt = parse parseFactor "" "2"
 parsefactor_testIdent = parse parseFactor "" "x"
-parsefactor_testIfexpr = parse parseFactor "" "?(2<x){2+x}{2+3}"
+parsefactor_testFunct = parse parseFactor "" "fib(2,3,ya)"
+parsefactor_testIfexpr = parse parseFactor "" "int ?(2<x){2+x}{2+3}"
 
 
 
@@ -170,6 +175,9 @@ parseArgType = try (Arg <$>parseType<*>identifier)
 parseArgType_testBol = parse parseArgType "" "bool x"
 parseArgType_testInt = parse parseArgType "" "int x"
 
+parseIntArgType = try (Arg <$> parseIntType <*> identifier)
+parseBoolArgType = try (Arg <$> parseBoolType <*> identifier)
+
 --parses all 3 types and then an identifier
 --methods used in -> parseFunDecl, VarDecl and GlobalVarDecl
 parseArgTypeVoid:: Parser ArgType
@@ -181,14 +189,22 @@ parseArgTypeVoid_testbool = parse parseArgTypeVoid "" "bool fib"
 --parses variables declaration
 parseVarDecl:: Parser Commands
 parseVarDecl = try (VarDecl <$> parseArgType <*>(reservedOp "=" *> parseExpr))
-parseVarDecl_test1 = parse parseVarDecl "" "int x = 2;"
-parseVarDecl_test2 = parse parseVarDecl "" "int x = fib(2);"
+           <|> try (VarDecl <$> parseBoolArgType <*>(return (BoolConst False)))
+           <|> try (VarDecl <$> parseIntArgType <*>(return (Constant 0)))
+parseVarDecl_testint1 = parse parseVarDecl "" "int x ;"
+parseVarDecl_testint2 = parse parseVarDecl "" "int x = fib(2);"
+parseVarDecl_testbool1 = parse parseVarDecl "" "bool x ;"
+parseVarDecl_testbool2 = parse parseVarDecl "" "bool x = ya;"
 
 --parses global variables delcation
 parseGlobalVarDecl:: Parser Commands
-parseGlobalVarDecl = GlobalVarDecl <$>(reserved "global" *> parseArgType) <*>(reservedOp "=" *> parseExpr)
-parseGlobalVarDecl_test1 = parse parseGlobalVarDecl "" "global bool x = nu;"
-parseGlobalVarDecl_test2 = parse parseGlobalVarDecl "" "global int x = fib(2);"
+parseGlobalVarDecl =   try (GlobalVarDecl <$>(reserved "global" *> parseArgType) <*>(reservedOp "=" *> parseExpr))
+                  <|>  try (GlobalVarDecl <$>(reserved "global" *> parseIntArgType) <*>(return (Constant 0)))
+                  <|>  try (GlobalVarDecl <$>(reserved "global" *>parseBoolArgType) <*>(return (BoolConst False)))
+parseGlobalVarDecl_testbool1 = parse parseGlobalVarDecl "" "global bool x ;"
+parseGlobalVarDecl_testbool2 = parse parseGlobalVarDecl "" "global bool x = ya;"
+parseGlobalVarDecl_testint1 = parse parseGlobalVarDecl "" "global int x ;"
+parseGlobalVarDecl_testint2 = parse parseGlobalVarDecl "" "global int x = 1;"
 
 --parses assignment
 parseAss:: Parser Commands

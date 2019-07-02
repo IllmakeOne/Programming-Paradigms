@@ -232,11 +232,15 @@ findinDb _ [] = error "undeclared variable called"
 --checks if the expression in a condition are the same type
 -- returns true if they are and false if they are no the same type
 typeCheckCondition :: Condition -> [DataBase] -> Bool
-typeCheckCondition (Lt e1 e2)  db = typeExpr e1 db == typeExpr e2 db
 typeCheckCondition (Eq e1 e2)  db = typeExpr e1 db == typeExpr e2 db
-typeCheckCondition (Gt e1 e2)  db = typeExpr e1 db == typeExpr e2 db
-typeCheckCondition (Lq e1 e2)  db = typeExpr e1 db == typeExpr e2 db
-typeCheckCondition (Gq e1 e2)  db = typeExpr e1 db == typeExpr e2 db
+typeCheckCondition (Lt e1 e2)  db | typeExpr e1 db == typeExpr e2 db && not (typeExpr e1 db == SimplyBol) = True
+                                  | typeExpr e1 db == typeExpr e2 db = error "Bools cannot only be =="
+typeCheckCondition (Gt e1 e2)  db | typeExpr e1 db == typeExpr e2 db && not (typeExpr e1 db == SimplyBol) = True
+                                  | typeExpr e1 db == typeExpr e2 db = error "Bools cannot only be =="
+typeCheckCondition (Lq e1 e2)  db | typeExpr e1 db == typeExpr e2 db && not (typeExpr e1 db == SimplyBol) = True
+                                  | typeExpr e1 db == typeExpr e2 db = error "Bools cannot only be =="
+typeCheckCondition (Gq e1 e2)  db | typeExpr e1 db == typeExpr e2 db && not (typeExpr e1 db == SimplyBol) = True
+                                  | typeExpr e1 db == typeExpr e2 db = error "Bools cannot only be =="
 
 getParamType :: Param -> Type
 getParamType (ByVal (Arg x _)) =  x
