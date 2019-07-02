@@ -7,7 +7,6 @@ import Structure
 import Text.Parsec.String
 import Data.Maybe
 import Debug.Trace
-
 --Block [VarDecl (Arg SimplyInt "jesse") (Constant 1000),
 -- GlobalVarDecl (Arg SimplyInt "robert") (Constant 1000),
 -- VarDecl (Arg SimplyInt "marieke") (Constant 5000),FunDecl (Arg SimplyInt "transfer") [ByRef (Arg SimplyInt "from"),ByRef (Arg SimplyInt "to"),ByVal (Arg SimplyInt "amount")] (Block [IfCom (Gq (Identifier "from") (Identifier "amount")) (Block [MinCom "from" (Identifier "amount"),AddCom "to" (Identifier "amount"),End]) (Block [End]),End]),FunDecl (Arg SimplyNull "helicopterMoney") [ByVal (Arg SimplyInt "to"),ByVal (Arg SimplyInt "amount")] (Block [AddCom "to" (Identifier "amount"),While (Lt (Identifier "to") (Identifier "robert")) (Block [AddCom "to" (Identifier "amount"),End]),End]),Fork (Block [FunCall "helicopterMoney" [Identifier "jesse",Constant 9000],End]
