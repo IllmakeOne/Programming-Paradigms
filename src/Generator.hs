@@ -3,8 +3,10 @@ module Generator where
 import Sprockell
 import Parser
 import TreeWalker
+import Structure
 import Text.Parsec.String
 import Data.Maybe
+import Debug.Trace
 
 --Block [VarDecl (Arg SimplyInt "jesse") (Constant 1000),
 -- GlobalVarDecl (Arg SimplyInt "robert") (Constant 1000),
@@ -23,7 +25,16 @@ generation xs = genBlock commands smTable ++ [EndProg]
 
 genBlock :: [Commands] -> [DataBase] -> [Instruction]
 genBlock [] _ = []
-genBlock (x:xs) smTable = gen x smTable ++ genBlock xs smTable
+-- Here span funcdecl commands
+genBlock commands smTable = (traceShow smTable) [Sprockell.Nop] -- gen x smTable ++ genBlock xs smTable
+  where
+    (functions, main) = span isFunction commands
+
+
+isFunction :: Commands -> Bool
+isFunction (FunDecl _ _ _) = True
+isFunction _ = False
+
 
 -- ALSO OPEN A NEW SCOPE!!!
 
@@ -31,7 +42,7 @@ genBlock (x:xs) smTable = gen x smTable ++ genBlock xs smTable
 gen :: Commands -> [DataBase] -> [Instruction]
 -- Generate end
 gen End _ = []
-gen Parser.Nop _ = [Sprockell.Nop]
+gen Structure.Nop _ = [Sprockell.Nop]
 -- Generate a variable
 gen (VarDecl (Arg varType name) expr) smTable = genVar name expr Nothing smTable -- genExpr expr smTable ++ -- pop that expression into regD
 --                                    memAddr smTable name ++ -- eddress is in regE
@@ -71,9 +82,9 @@ gen (While cond block) smTable
     lengthWhileBody = length genWhileBody
 
 -- Generate code for decreasing a value
-gen (Parser.Decr varName) smTable = incrDecrVar varName Sprockell.Decr smTable
+gen (Structure.Decr varName) smTable = incrDecrVar varName Sprockell.Decr smTable
 -- Generate code for increasing a value
-gen (Parser.Incr varName) smTable = incrDecrVar varName Sprockell.Incr smTable
+gen (Structure.Incr varName) smTable = incrDecrVar varName Sprockell.Incr smTable
 -- Generate code for += statements
 gen (AddCom varName expr) smTable = genVar varName expr (Just Sprockell.Add) smTable
 -- Same as before, Generate code for -= statements
@@ -172,9 +183,9 @@ genExpr (Paren expr) smTable = genExpr expr smTable
 genExpr (Identifier name) smTable = memAddr smTable name
                                     ++ [Load (IndAddr regE) regD, Push regD]
 -- Generate a calculation of two expressions
-genExpr (Parser.Mult exp1 exp2) smTable = genTwoExpr (Sprockell.Mul, exp1, exp2) smTable
-genExpr (Parser.Add exp1 exp2) smTable  = genTwoExpr (Sprockell.Add, exp1, exp2) smTable
-genExpr (Parser.Min exp1 exp2) smTable  = genTwoExpr (Sprockell.Sub, exp1, exp2) smTable
+genExpr (Structure.Mult exp1 exp2) smTable = genTwoExpr (Sprockell.Mul, exp1, exp2) smTable
+genExpr (Structure.Add exp1 exp2) smTable  = genTwoExpr (Sprockell.Add, exp1, exp2) smTable
+genExpr (Structure.Min exp1 exp2) smTable  = genTwoExpr (Sprockell.Sub, exp1, exp2) smTable
 
 -- Generate an inline if statement
 -- It's the same as if statement above but now with expressions instead of blocks.
@@ -193,11 +204,11 @@ genExpr _ smTable = error "genExpr error"
 
 -- Generate the code for doing a condition with two expressions
 genCond :: Condition -> [DataBase] -> [Instruction]
-genCond (Parser.Lt exp1 exp2) smTable = genTwoExpr (Sprockell.Lt,    exp1, exp2) smTable
-genCond (Parser.Eq exp1 exp2) smTable = genTwoExpr (Sprockell.Equal, exp1, exp2) smTable
-genCond (Parser.Gt exp1 exp2) smTable = genTwoExpr (Sprockell.Gt,    exp1, exp2) smTable
-genCond (Parser.Lq exp1 exp2) smTable = genTwoExpr (Sprockell.LtE,   exp1, exp2) smTable
-genCond (Parser.Gq exp1 exp2) smTable = genTwoExpr (Sprockell.GtE,   exp1, exp2) smTable
+genCond (Structure.Lt exp1 exp2) smTable = genTwoExpr (Sprockell.Lt,    exp1, exp2) smTable
+genCond (Structure.Eq exp1 exp2) smTable = genTwoExpr (Sprockell.Equal, exp1, exp2) smTable
+genCond (Structure.Gt exp1 exp2) smTable = genTwoExpr (Sprockell.Gt,    exp1, exp2) smTable
+genCond (Structure.Lq exp1 exp2) smTable = genTwoExpr (Sprockell.LtE,   exp1, exp2) smTable
+genCond (Structure.Gq exp1 exp2) smTable = genTwoExpr (Sprockell.GtE,   exp1, exp2) smTable
 
 -- Generate a calculation of two expressions. Evaluates both expressions and pushes back the result to the stack.
 genTwoExpr :: (Operator, Expr, Expr) -> [DataBase] -> [Instruction]
@@ -229,7 +240,7 @@ codeGenTest = do
     Left err -> print err
     Right xs -> do
       print code
-      run [code]
+      -- run [code]
       where
         code = generation xs
 
