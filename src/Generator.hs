@@ -5,6 +5,7 @@ import Parser
 import TreeWalker
 import Text.Parsec.String
 import Data.Maybe
+import Structure
 
 --Block [VarDecl (Arg SimplyInt "jesse") (Constant 1000),
 -- GlobalVarDecl (Arg SimplyInt "robert") (Constant 1000),

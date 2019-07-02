@@ -18,7 +18,7 @@ import Structure
 --    and two integers, the first one is the scope of the vribale the second is the offset
 -- DBF which is for the functions declared in the program
 --    it keeps track of the method's name and type in ArgType and it's parameters
-data DataBase = DB ArgType Int Int | DBF ArgType [Param]
+data DataBase = DB ArgType Int Int | DBF ArgType [Param] Bloc
       deriving (Eq,Show)
 
 --String to Command List
@@ -67,7 +67,7 @@ treeBuilder ((FunDecl arg args bloc):xs) scope off | checkDuplicant db arg scope
     where
       db = treeBuilder xs scope off
       ownscope = treeBuilder (fromBlock bloc) (scope+1) (increaseOffset off (scope+1))
-      add = (DBF arg args)
+      add = (DBF arg args bloc)
       blocReturn = (findRetinBloc $ fromBlock bloc) --the return command of the method
       ret | typeArgtype arg == SimplyNull && blocReturn == (Return NullExpr) = SimplyNull
           | typeArgtype arg == SimplyNull && not (blocReturn == (Return NullExpr)) = error "Void methods has return"
@@ -137,7 +137,7 @@ checkDuplicant (( DB dbarg sco _):xs) arg scope
       | scope == sco && stringArtgType dbarg == stringArtgType arg = False
       | 0 == sco && stringArtgType dbarg == stringArtgType arg = error "Var with same name as global variable"
       | otherwise = checkDuplicant xs arg scope
-checkDuplicant ((DBF name params ):xs) arg scope
+checkDuplicant ((DBF name params _ ):xs) arg scope
       | stringArtgType name == stringArtgType arg = False
       | otherwise = checkDuplicant xs arg scope
 
@@ -224,7 +224,7 @@ typeExpr fun@(Funct name exprs) db | checkCorrectFuncExpr db fun = findinDb name
 findinDb:: String -> [DataBase] -> Type
 findinDb name ((DB  arg _ _):dbx) | name == stringArtgType arg = typeArgtype arg
                                   | otherwise = findinDb name dbx
-findinDb name ((DBF  arg  _):dbx) | name == stringArtgType arg = typeArgtype arg
+findinDb name ((DBF  arg  _ _):dbx) | name == stringArtgType arg = typeArgtype arg
                                   | otherwise = findinDb name dbx
 findinDb _ [] = error "undeclared variable called"
 
@@ -244,7 +244,7 @@ getParamType (ByRef (Arg x _)) =  x
 
 
 findMethodParamsDB :: [DataBase] -> String -> [Param]
-findMethodParamsDB ((DBF fname params):db) name | stringArtgType fname == name = params
+findMethodParamsDB ((DBF fname params _):db) name | stringArtgType fname == name = params
                                                 | otherwise = findMethodParamsDB db name
 findMethodParamsDB ((DB _ _ _):db) name = findMethodParamsDB db name
 findMethodParamsDB [] _ = error "Could not find methods params ind findMethodParamsDB"
