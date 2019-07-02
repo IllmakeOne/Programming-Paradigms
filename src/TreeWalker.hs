@@ -21,6 +21,22 @@ import Structure
 data DataBase = DB ArgType Int Int | DBF ArgType [Param] Bloc
       deriving (Eq,Show)
 
+data TypeError = Er String | Ok | Crt Type
+      deriving (Eq,Show)
+
+boolTypeError (Ok)= True
+boolTypeError (Crt _ )= True
+boolTypeError (Er _ )= False
+getType:: TypeError -> Type
+getType (Crt a) =  a
+getType (Ok ) = SimplyNull
+getType (Er _ ) = SimplyNull
+stringTypeError (Er message ) = message
+addMessage ::String -> TypeError ->TypeError
+addMessage soure (Er message) = Er (message ++ " in " ++soure)
+addMessage soure (Ok) = error "ok erro"
+addMessage soure (Crt _ ) = Er soure
+
 --String to Command List
 fromStCL :: String -> [Commands]
 fromStCL prog =fromBlock$ fromRight (Block [])  (parse parseBlock "" prog)
@@ -31,6 +47,7 @@ scopesTracker [] _ = error "Could not find offeset of scope"
 scopesTracker ((a,b):xs) x | a == x = b
                            | otherwise = scopesTracker xs x
 scopesTracker_test1 = scopesTracker [(1,0),(2,4)] 2
+scopesTracker_test2 = scopesTracker [(1,0),(2,4)] 1
 
 --this methods is used to increment the offest of a scope 'x'
 --if the scope is not declared yet, declare it with offset 0
@@ -79,10 +96,18 @@ treeBuilder ((Fork bloc):xs) scope off =
 treeBuilder (x:xs) scope off = treeBuilder xs scope off
 
 treeBuilder_test1 = treeBuilder
-          (fromBlock ( fromRight (Block [])  aux))
+          (fromBlock ( fromRight (Block [])  treeBuilder_test1_AST))
           1 []
-aux = parse parseBlock ""
+treeBuilder_test1_AST = parse parseBlock ""
       "{ global int z = 3 ;func int fib(int x, & int y){ int x =2 ;return y;}; int x = fib (ya, 2);func int fibi(int x, & int y){ int x =2 ;return y;};}"
+
+treeBuilder_test2 = treeBuilder
+          (fromBlock ( fromRight (Block [])  treeBuilder_test2_AST))
+          1 []
+treeBuilder_test2_AST = parse parseBlock ""
+      "{ global int a = 0 ;global bool b = ya; int c = 1; bool d; global bool e;func void aux(){ int b = 0;}; }"
+
+
 
 --this methods seraches for the return in a list of commands
 -- used in -> treeBuilder for fundecl for checking if a method has the corret  return type
@@ -105,7 +130,7 @@ addByrefParamsDb_tes1 = addByrefParamsDb [ByVal (Arg SimplyInt "x"),ByRef (Arg S
 --methods used in ->  treeBuilder for fundecl for checking if a method has the corret  return type
 exprTypeFromRet ::[DataBase] -> [Param] ->Bloc -> Commands -> Type
 exprTypeFromRet globalDb param bloc (Return expr) =
-   typeExpr expr db
+   getType$ typeExpr expr db
    where
      paramdb = addByrefParamsDb param 0 []
      blocdb = treeBuilder (fromBlock bloc) 0 []
@@ -146,77 +171,100 @@ checkDuplicant ((DBF name params _):xs) arg scope
 
 -- main type checking metods, takes a list of commands and the symbol table
 -- returns true if all types are correct and throws exceptions for wrong types
-typeCheckProgram :: [Commands] -> [DataBase] -> Bool
-typeCheckProgram (x:prog) db  | typeCheck db x = typeCheckProgram prog db
-                              | otherwise = error "Tyepe chekcpr porgram eror somehow"
-typeCheckProgram [] _ = True
+typeCheckProgram :: [Commands] -> [DataBase] -> [TypeError]
+typeCheckProgram (x:prog) db  | boolTypeError$ typeCheck db x = typeCheckProgram prog db
+                              | otherwise = typeCheck db x : typeCheckProgram prog db
+typeCheckProgram [] _ = []
 
 typeCheckProgram_test stg =
   typeCheckProgram (fromStCL stg) (treeBuilder (fromStCL stg) 1 [])
 
 typeCheckProgram_test1 = typeCheckProgram_test "{ int x = 0; int y = 2; int z = x+y; print x;}"
 typeCheckProgram_test2 = typeCheckProgram_test "{ int x = 0; int y = 2; int z = ya; print x;}"
-typeCheckProgram_test3 = typeCheckProgram_test "{ func int fib(int x,& int y){}; int x = fib (2, 2);}"
+typeCheckProgram_test3 = typeCheckProgram_test "{ while(ya >= 2){ int x;};}"
 typeCheckProgram_test4 = typeCheckProgram_test "{ func int fib(int x,& int y){return 0}; int x = fib (2, nu);}"
-
+aux= parse parseBlock " " "{ int x; bool y; x = 2 + ya; } "
 
 --this metiods check is an individial command has the correct type
 -- returns true if the types are correct and throws an error for different reasons
 -- used in -> typeCheckProgram
-typeCheck :: [DataBase] -> Commands -> Bool
-typeCheck db (VarDecl typ ex) | typeArgtype typ == typeExpr ex db = True
-                              | otherwise = error "Type error in type declarations"
-typeCheck db (GlobalVarDecl typ ex) | typeArgtype typ == typeExpr ex db = True
-                              | otherwise = error "Type error in global type declarations"
-typeCheck db fun@(FunCall name exprs) | findinDb name db == SimplyNull && checkCorrectFuncCommand db fun= True
-                              | otherwise = error "Type error in fucntion call"
-typeCheck db (Ass name ex) | findinDb name db == typeExpr ex db = True
-                              | otherwise = error "Type error in variable assignment"
-typeCheck db (Decr name) | findinDb name db == SimplyInt = True
-                              | otherwise = error "Type error in variable decrese '--' "
-typeCheck db (Incr name) | findinDb name db == SimplyInt = True
-                              | otherwise = error "Type error in variable increaase '++' "
-typeCheck db (AddCom name ex) | findinDb name db == typeExpr ex db = True
-                              | otherwise = error "Type error in add command += "
-typeCheck db (MinCom name ex) | findinDb name db == typeExpr ex db = True
-                              | otherwise = error "Type error in minus commdn -= "
-typeCheck db (While cond _) | typeCheckCondition cond db = True
-                          | otherwise = error "Cond var not the same type in While"
-typeCheck db (IfCom cond _ _) | typeCheckCondition cond db = True
-                              | otherwise = error "Cond var not the same type in IfCom"
-typeCheck _ _ = True
+typeCheck :: [DataBase] -> Commands -> TypeError
+typeCheck db (VarDecl typ ex) | typeArgtype typ == (getType$ typeExpr ex db) = Ok
+                              | otherwise = Er ("VarDecl " ++ stringArtgType typ ++ " wrong type assigned")
+typeCheck db (GlobalVarDecl typ ex) | typeArgtype typ == (getType$ typeExpr ex db) = Ok
+                              | otherwise = Er  ("GlobalVarDecl " ++ stringArtgType typ ++ " wrong type assigned")
+typeCheck db fun@(FunCall name exprs) | findinDb name db == SimplyNull && boolTypeError (checkCorrectFuncCommand db fun)= Ok
+                              | boolTypeError (checkCorrectFuncCommand db fun) = Er ("Funcall "++name ++ " is not null type")
+                              | otherwise =  addMessage ("Funcall "++name) (checkCorrectFuncCommand db fun)
+typeCheck db (Ass name ex) | findinDb name db == (getType$ typeExpr ex db) = Ok
+                              | otherwise = addMessage ("Assigment "++ name) (typeExpr ex db)
+typeCheck db (Decr name) | findinDb name db == SimplyInt = Ok
+                              | otherwise = Er (name++" is not int, cannot --")
+typeCheck db (Incr name) | findinDb name db == SimplyInt = Ok
+                              | otherwise = Er (name++" is not int, cannot ++")
+typeCheck db (AddCom name ex) | findinDb name db == (getType$ typeExpr ex db) = Ok
+                              | not (boolTypeError$ typeExpr ex db) = addMessage ("Add Command "++ name) (typeExpr ex db)
+                              | otherwise = Er ("Type error Add Command "++ name)
+typeCheck db (MinCom name ex) | findinDb name db == (getType$ typeExpr ex db) = Ok
+                              | not (boolTypeError$ typeExpr ex db) = addMessage ("Min Command "++ name) (typeExpr ex db)
+                              | otherwise = Er ("Type error in Min Command "++ name)
+typeCheck db (While cond _) | boolTypeError$ typeCheckCondition cond db = Ok
+                            | otherwise = addMessage "While" (typeCheckCondition cond db)
+typeCheck db (IfCom cond _ _) | boolTypeError$ typeCheckCondition cond db = Ok
+                              | otherwise = addMessage "IfCom" (typeCheckCondition cond db)
+typeCheck _ _ = Ok
+
+typeCheck_test_vadecl1 = typeCheckProgram_test "{ int x = ya;}"
+typeCheck_test_vadecl2 = typeCheckProgram_test "{ bool x = 2*3;}"
+typeCheck_test_globalvadecl1 = typeCheckProgram_test "{ global int x = ya;}"
+typeCheck_test_globalvadecl2 = typeCheckProgram_test "{ global bool x = 2+4*2;}"
+typeCheck_test_funcall1 = typeCheckProgram_test "{ func int fib(int x){ int y; return y;}; fib(2);}"
+typeCheck_test_funcall2 = typeCheckProgram_test "{ func void fib(int x){ int y;}; fib(2,3);}"
+typeCheck_test_funcall3 = typeCheckProgram_test "{ func int fib(int x){ int y;return y; }; fib(2);}"
+typeCheck_test_ass1 = typeCheckProgram_test "{ int x; bool y; x = 2 + ya; }"
+typeCheck_test_ass2 = typeCheckProgram_test "{ int x; bool y; y = x;}"
+typeCheck_test_incr = typeCheckProgram_test "{ bool x;x++;}"
+typeCheck_test_decr = typeCheckProgram_test "{ bool x;x--;}"
+typeCheck_test_addcom1 = typeCheckProgram_test "{ bool x; x+= 2+ya;}"
+typeCheck_test_addcom2 = typeCheckProgram_test "{ int x; x+= ya;}"
+typeCheck_test_mincom1 = typeCheckProgram_test "{ bool x; x-= 2+ya;}"
+typeCheck_test_mincom2 = typeCheckProgram_test "{ int x; x-= ya;}"
+typeCheck_test_while1 = typeCheckProgram_test "{ while(ya >= 2){ int x;};}"
+typeCheck_test_ifcomand = typeCheckProgram_test "{ if(ya >= 2){ int x;}{};}"
 
 
 -- this methdos takes and expression and the database and returns the expression's type
 -- used in -> typeCheck, exprTypeFromRet, typeCheckCondition
 -- if the exprssions withing the argument expresson are wrong, an appropriete error message will arise
-typeExpr :: Expr -> [DataBase]-> Type
-typeExpr (Constant _ ) db = SimplyInt
-typeExpr (BoolConst _ ) db = SimplyBol
-typeExpr (Mult e1 e2 ) db | not (t1 == t2) = error "Mutiplication elements are not the same type"
-                          | t1 == SimplyInt = SimplyInt
-                          | t1 == SimplyBol = error "Multiplication of bools not allowed"
+typeExpr :: Expr -> [DataBase]-> TypeError
+typeExpr (Constant _ ) db =Crt SimplyInt
+typeExpr (BoolConst _ ) db = Crt SimplyBol
+typeExpr (Mult e1 e2 ) db | not (t1 == t2) = Er "Mutiplication elements are not the same type"
+                          | t1 ==Crt  SimplyInt =Crt  SimplyInt
+                          | t1 ==Crt  SimplyBol = Er "Multiplication of bools not allowed"
         where
           t1 = typeExpr e1 db
           t2 = typeExpr e2 db
-typeExpr (Add e1 e2 ) db | not (t1 == t2) = error "Addition elemets are not the same type"
-                       | t1 == SimplyInt = SimplyInt
-                       | t1 == SimplyBol = error "Addition of bools not allowed"
+typeExpr (Add e1 e2 ) db | not (t1 == t2) = Er "Addition elemets are not the same type"
+                       | t1 == Crt SimplyInt =Crt SimplyInt
+                       | t1 ==Crt  SimplyBol = Er "Addition of bools not allowed"
         where
           t1 = typeExpr e1 db
           t2 = typeExpr e2 db
 typeExpr (Paren x ) db = typeExpr x db
-typeExpr (Min e1 e2 ) db | not (t1 == t2) = error "Substractions elemets are not the same type"
-                       | t1 == SimplyInt = SimplyInt
-                       | t1 == SimplyBol = error "subtraction of bools not allowed"
+typeExpr (Min e1 e2 ) db | not (t1 == t2) = Er "Substractions elemets are not the same type"
+                       | t1 == Crt SimplyInt = Crt SimplyInt
+                       | t1 == Crt SimplyBol = Er "subtraction of bools not allowed"
         where
           t1 = typeExpr e1 db
           t2 = typeExpr e2 db
-typeExpr (IfExpr typ cond _ _ ) db | typeCheckCondition cond db = typ
-                                   | otherwise = error "Condition types not the same in IfExpr"
-typeExpr (Identifier x ) db = findinDb x db
-typeExpr fun@(Funct name exprs) db | checkCorrectFuncExpr db fun = findinDb name db
-                                   | otherwise = error "Function's arguments are not correct in FuncExpr"
+typeExpr (IfExpr typ cond _ _ ) db | boolTypeError$ typeCheckCondition cond db =Crt  typ
+                                   | otherwise = Er "Condition types not the same in IfExpr"
+typeExpr (Identifier x ) db = Crt$ findinDb x db
+typeExpr fun@(Funct name exprs) db | checkCorrectFuncExpr db fun = Crt$ findinDb name db
+                                   | otherwise = Er "Function's arguments are not correct in FuncExpr"
+
+typeExpr _ _ =Crt  SimplyNull
 
 
 --this methods looks in the database for a namse and returns its type
@@ -231,16 +279,21 @@ findinDb _ [] = error "undeclared variable called"
 
 --checks if the expression in a condition are the same type
 -- returns true if they are and false if they are no the same type
-typeCheckCondition :: Condition -> [DataBase] -> Bool
-typeCheckCondition (Eq e1 e2)  db = typeExpr e1 db == typeExpr e2 db
-typeCheckCondition (Lt e1 e2)  db | typeExpr e1 db == typeExpr e2 db && not (typeExpr e1 db == SimplyBol) = True
-                                  | typeExpr e1 db == typeExpr e2 db = error "Bools cannot only be =="
-typeCheckCondition (Gt e1 e2)  db | typeExpr e1 db == typeExpr e2 db && not (typeExpr e1 db == SimplyBol) = True
-                                  | typeExpr e1 db == typeExpr e2 db = error "Bools cannot only be =="
-typeCheckCondition (Lq e1 e2)  db | typeExpr e1 db == typeExpr e2 db && not (typeExpr e1 db == SimplyBol) = True
-                                  | typeExpr e1 db == typeExpr e2 db = error "Bools cannot only be =="
-typeCheckCondition (Gq e1 e2)  db | typeExpr e1 db == typeExpr e2 db && not (typeExpr e1 db == SimplyBol) = True
-                                  | typeExpr e1 db == typeExpr e2 db = error "Bools cannot only be =="
+typeCheckCondition :: Condition -> [DataBase] -> TypeError
+typeCheckCondition (Eq e1 e2)  db | typeExpr e1 db == typeExpr e2 db = Ok
+                                  | otherwise =  Er "Not same type in Eq Condtion"
+typeCheckCondition (Lt e1 e2)  db | typeExpr e1 db == typeExpr e2 db && not (typeExpr e1 db == Crt SimplyBol) = Ok
+                                  | typeExpr e1 db == typeExpr e2 db = Er "Bools cannot be >"
+                                  | otherwise =  Er "Not same type in Lt Condtion"
+typeCheckCondition (Gt e1 e2)  db | typeExpr e1 db == typeExpr e2 db && not (typeExpr e1 db == Crt SimplyBol) = Ok
+                                  | typeExpr e1 db == typeExpr e2 db = Er "Bools cannot be <"
+                                  | otherwise =  Er "Not same type in Gt Condtion"
+typeCheckCondition (Lq e1 e2)  db | typeExpr e1 db == typeExpr e2 db && not (typeExpr e1 db ==Crt  SimplyBol) = Ok
+                                  | typeExpr e1 db == typeExpr e2 db = Er "Bools cannot be <="
+                                  | otherwise =  Er "Not same type in Lq Condtion"
+typeCheckCondition (Gq e1 e2)  db | typeExpr e1 db == typeExpr e2 db && not (typeExpr e1 db ==Crt  SimplyBol) = Ok
+                                  | typeExpr e1 db == typeExpr e2 db = Er "Bools cannot be >="
+                                  | otherwise =  Er "Not same type in Gq Condtion"
 
 getParamType :: Param -> Type
 getParamType (ByVal (Arg x _)) =  x
@@ -257,7 +310,7 @@ comparaParamsandArgs :: [DataBase] -> [Param] -> [Expr] -> Bool
 comparaParamsandArgs _ [] [] = True
 comparaParamsandArgs _ [] _ = False
 comparaParamsandArgs _ _ [] = False
-comparaParamsandArgs db (para:params) (e:exprs) | getParamType para == typeExpr e db
+comparaParamsandArgs db (para:params) (e:exprs) | getParamType para == (getType$typeExpr e db)
                                         = comparaParamsandArgs db params exprs
                           | otherwise = False
 
@@ -265,9 +318,9 @@ comparaParamsandArgs db (para:params) (e:exprs) | getParamType para == typeExpr 
 checkCorrectFuncExpr :: [DataBase] -> Expr -> Bool
 checkCorrectFuncExpr db (Funct name args ) = comparaParamsandArgs db (findMethodParamsDB db name) args
 
-checkCorrectFuncCommand :: [DataBase] -> Commands-> Bool
-checkCorrectFuncCommand db (FunCall name args ) | comparaParamsandArgs db (findMethodParamsDB db name) args = True
-                                           | otherwise = error "Function's arguments are not correct in FuncCommand"
+checkCorrectFuncCommand :: [DataBase] -> Commands-> TypeError
+checkCorrectFuncCommand db (FunCall name args ) | comparaParamsandArgs db (findMethodParamsDB db name) args = Ok
+                                           | otherwise = Er "Function's arguments are not correct"
 
 
 

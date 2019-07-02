@@ -24,11 +24,6 @@ pt = [
               (Right (Eq (Constant 2) (Funct "fib" [Constant 2])))
         },
     ParseT {
-        testName = "parseCondition_test2",
-        testParse =  parse parseCondition "" "2 < fib(2)" ==
-              (Right (Lt (Constant 2) (Funct "fib" [Constant 2])))
-        },
-    ParseT {
         testName = "parseCondition_test3",
         testParse = parse parseCondition "" " 2 >= fib(2)" ==
               (Right (Gq (Constant 2) (Funct "fib" [Constant 2])))
@@ -111,6 +106,36 @@ pt = [
         testName = "params_test1",
         testParse = parse params "" "& bool h, \n int x, \n bool x" ==
               (Right [ByRef (Arg SimplyBol "h"),ByVal (Arg SimplyInt "x"),ByVal (Arg SimplyBol "x")])
+        },
+
+
+    ------------------------------------------------------------------------
+-------------------------------Elaboration Tests-------------------------------------
+    ------------------------------------------------------------------------
+
+    ParseT {
+        testName = "scopesTracker_test1",
+        testParse = scopesTracker [(1,0),(2,4)] 2 == 4
+        },
+    ParseT {
+        testName = "scopesTracker_test2",
+        testParse = scopesTracker [(1,0),(2,4)] 1 == 0
+        },
+    ParseT {
+        testName = "increaseOffset_test2",
+        testParse = increaseOffset [] 2 == [(2,0)]
+        },
+    ParseT {
+        testName = "increaseOffset_test2",
+        testParse = increaseOffset [(1,0),(2,4)] 2 == [(1,0),(2,5)]
+        },
+    ParseT {
+        testName = "treeBuilder_test1",
+        testParse = treeBuilder_test1 == treeBuilder_test1_correct
+        },
+    ParseT {
+        testName = "treeBuilder_test2",
+        testParse = treeBuilder_test2 == treeBuilder_test2_correct
         }
     ]
 
@@ -124,3 +149,25 @@ runTests [] = True
 
 main | runTests pt = print "All tests which should pass, passed"
      | otherwise = error " Something very wrong in main test"
+
+
+
+-- ughguh = runTests pt `catchError` print "sadasdas"
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+treeBuilder_test1_correct = [DB (Arg SimplyInt "z") 0 0,DBF (Arg SimplyInt "fib") [ByVal (Arg SimplyInt "x"),ByRef (Arg SimplyInt "y")] (Block [VarDecl (Arg SimplyInt "x") (Constant 2),Return (Identifier "y"),End]),DB (Arg SimplyInt "x") 2 1,DB (Arg SimplyInt "x") 1 0,DBF (Arg SimplyInt "fibi") [ByVal (Arg SimplyInt "x"),ByRef (Arg SimplyInt "y")] (Block [VarDecl (Arg SimplyInt "x") (Constant 2),Return (Identifier "y"),End]),DB (Arg SimplyInt "x") 2 1]
+treeBuilder_test2_correct = [DB (Arg SimplyInt "a") 0 0,DB (Arg SimplyBol "b") 0 1,DB (Arg SimplyInt "c") 1 0,DB (Arg SimplyBol "d") 1 1,DB (Arg SimplyBol "e") 0 2,DBF (Arg SimplyNull "aux") [] (Block [VarDecl (Arg SimplyInt "b") (Constant 0),End]),DB (Arg SimplyInt "b") 2 1]

@@ -73,8 +73,7 @@ parseType = try (reserved "bool"  >> return SimplyBol )
           <|> try (reserved "int"  >> return SimplyInt )
 parseType_testbool = parse parseType "" "bool"
 parseType_testint = parse parseType "" "int"
-
-
+--helper methods used in VarDecl
 parseIntType = try (reserved "int"  >> return SimplyInt )
 parseBoolType = try (reserved "bool"  >> return SimplyBol )
 
@@ -105,6 +104,11 @@ parsefactor_testCosnt = parse parseFactor "" "2"
 parsefactor_testIdent = parse parseFactor "" "x"
 parsefactor_testFunct = parse parseFactor "" "fib(2,3,ya)"
 parsefactor_testIfexpr = parse parseFactor "" "int ?(2<x){2+x}{2+3}"
+
+
+
+
+
 
 ----------------------------------------------------------------------------------
 -----------------------Parse Commands----------------------------------------------
@@ -268,13 +272,6 @@ params_test1 = parse params "" "& bool h, \n int x, \n bool x"
 
 bigtest = parse parseBlock ""
           "{ int jesse = 1000; global int robert = 1000; while(robert == 0){ jesse++;}; int marieke = 5000; func int transfer(& int from,& int to, int amount) { jesse++; if (from >= amount) { from -= amount; to += amount;} {};}; func void helicopterMoney(int to, int amount) { to += amount;  };  fork { helicopterMoney(jesse, 9000);};  fork { helicopterMoney(robert, 9000);}; join;  print  jesse;  };"
-
-
-fromRight :: b -> Either a b -> b
-fromRight b (Left _) = b
-fromRight _ (Right b) = b
-
-
 
 
 
