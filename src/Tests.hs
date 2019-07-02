@@ -15,7 +15,9 @@ data ParseTest =  ParseT { testName :: String, testParse :: Bool }
 
 -- problems = [ParseTest]
 pt = [
--------------Expssion Tests-------------------------
+      ------------------------------------------------------------------------
+-------------------------------Expression parsing Tests-------------------------------------
+      ------------------------------------------------------------------------
     ParseT {
         testName = "parseCondition_test1",
         testParse = parse parseCondition "" "2 == fib(2)" ==
@@ -33,7 +35,7 @@ pt = [
         },
     ParseT {
         testName = "parseTerm_test2",
-        testParse =  parse parseTerm "" "2*4*4" ==
+        testParse =  parse parseExpr "" "2*4*4" ==
               (Right (Mult (Constant 2) (Mult (Constant 4) (Constant 4))))
         },
     ParseT {
@@ -63,15 +65,19 @@ pt = [
         },
     ParseT {
         testName = "parsefactor_testFunct",
-        testParse =  parse parseFactor "" "fib(2,3,ya)" ==
+        testParse =  parse parseExpr "" "fib(2,3,ya)" ==
               (Right (Funct "fib" [Constant 2,Constant 3,BoolConst True]))
         },
     ParseT {
         testName = "parsefactor_testIfexpr",
-        testParse =  parse parseFactor "" "int ?(2<x){2+x}{2+3}" ==
+        testParse =  parse parseExpr "" "int ?(2<x){2+x}{2+3}" ==
               (Right (IfExpr SimplyInt (Lt (Constant 2) (Identifier "x")) (Add (Constant 2) (Identifier "x")) (Add (Constant 2) (Constant 3))))
         },
--------------------Command Tests-------------------------------------
+
+
+    ------------------------------------------------------------------------
+-------------------------------Command parsing Tests-------------------------------------
+    ------------------------------------------------------------------------
     ParseT {
         testName = "parseCommand_testJoin",
         testParse =  parse parseCommand "" "join ;" == Right Join
@@ -87,11 +93,25 @@ pt = [
               (Right (Block [Nop,Nop,End]))
         },
     ParseT {
-        testName = "parseVarDecl_testbool2",
-        testParse = parse parseVarDecl "" "bool x = ya;" ==
-              (Right (VarDecl (Arg SimplyBol "x") (BoolConst True)))
+        testName = "parseIfCom_tesst2",
+        testParse = parse parseCommand "" "if (from >= amount) { from -= amount; to += amount;} {};" ==
+              (Right (IfCom (Gq (Identifier "from") (Identifier "amount")) (Block [MinCom "from" (Identifier "amount"),AddCom "to" (Identifier "amount"),End]) (Block [End])))
+        },
+    ParseT {
+        testName = "parseFunDecl_test2",
+        testParse = parse parseCommand "" "func void theStuff(int a, bool b){ int x = a;}" ==
+              (Right (FunDecl (Arg SimplyNull "theStuff") [ByVal (Arg SimplyInt "a"),ByVal (Arg SimplyBol "b")] (Block [VarDecl (Arg SimplyInt "x") (Identifier "a"),End])))
+        },
+    ParseT {
+        testName = "parseIncr_test1",
+        testParse = parse parseCommand "" "x ++;" ==
+              (Right (Incr "x"))
+        },
+    ParseT {
+        testName = "params_test1",
+        testParse = parse params "" "& bool h, \n int x, \n bool x" ==
+              (Right [ByRef (Arg SimplyBol "h"),ByVal (Arg SimplyInt "x"),ByVal (Arg SimplyBol "x")])
         }
-
     ]
 
 

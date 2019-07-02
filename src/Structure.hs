@@ -65,3 +65,7 @@ typeArgtype (Arg t _ ) = t
 
 stringArtgType :: ArgType ->  String
 stringArtgType (Arg _ x ) = x
+
+fromRight :: b -> Either a b -> b
+fromRight b (Left _) = b
+fromRight _ (Right b) = b
