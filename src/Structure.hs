@@ -40,12 +40,11 @@ data Expr = Constant Integer -- DONE IMPLEMENTED IN GENERATOR
             | Identifier String
             | Mult Expr Expr
             | Add Expr Expr
+            | Min Expr Expr
             | Funct String [Expr]
             | IfExpr Type Condition Expr Expr
             | Paren Expr
-            | Min Expr Expr
             | NullExpr
-            -- | Zero
             deriving (Eq,Show)
 
 data Condition = Lt Expr Expr -- DONE IMPLEMENTED IN GENERATOR

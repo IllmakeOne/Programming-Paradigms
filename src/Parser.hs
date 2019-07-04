@@ -42,8 +42,6 @@ parseExpr =
       try (Add <$> parseTerm<*>(reservedOp "+"*>parseExpr))
       <|> try ( Min <$> parseTerm<*>(reservedOp "-"*>parseExpr))
       <|> try (parseTerm)
-      <|> try ((reserved "ya"  >> return (BoolConst True ))) -- parse Constant true
-      <|> try ((reserved "nu"  >> return (BoolConst False ))) -- parse Constant false
 parseExpr_test1 = parse parseExpr "" "3+3*2"
 parseExpr_test2 = parse parseExpr "" "fib(2) + 32"
 parseExpr_test3 = parse parseExpr "" "2 - 32 +2"
@@ -58,6 +56,22 @@ parseTerm =
     <|> try (parseFactor)
 parseTerm_test1 = parse parseTerm "" "2*4"
 parseTerm_test2 = parse parseTerm "" "2*4*4"
+
+
+-- Factor parser, lowerst ranked
+parseFactor :: Parser Expr
+parseFactor = try (Constant <$> integer)
+      <|> try parseIfExpr
+      <|> try (Funct <$> identifier<*> parens arguments)
+      <|> try (Paren <$> parens parseExpr)
+      <|> try (Identifier <$> identifier)
+      <|> try ((reserved "ya"  >> return (BoolConst True ))) -- parse Constant true
+      <|> try ((reserved "nu"  >> return (BoolConst False ))) -- parse Constant falses
+parsefactor_testCosnt = parse parseFactor "" "2"
+parsefactor_testIdent = parse parseFactor "" "x"
+parsefactor_testFunct = parse parseFactor "" "fib(2,3,ya)"
+parsefactor_testIfexpr = parse parseFactor "" "int ?(2<x){2+x}{2+3}"
+
 
 
 --parses a list of expression
@@ -88,22 +102,9 @@ parseVoidType_test = parse parseVoidType "" "void"
 
 parseIfExpr :: Parser Expr
 parseIfExpr = IfExpr <$> parseType <*>(reserved "?" *> parens parseCondition)
-          <*> braces parseExpr
-          <*> braces parseExpr
+              <*> braces parseExpr <*> braces parseExpr
 parseIfexpr_tesst1 = parse parseIfExpr "" "int ?(2==2){2+1}{2}"
 parseIfexpr_tesst2 = parse parseIfExpr "" "bool ?(2==2){nu}{ya}"
-
-parseFactor :: Parser Expr
-parseFactor = try (Constant <$> integer)
-      <|> try parseIfExpr
-      <|> try (Funct <$> identifier<*> parens arguments)
-      <|> try (Paren <$> parens parseExpr)
-      <|> try (Identifier <$> identifier)
-
-parsefactor_testCosnt = parse parseFactor "" "2"
-parsefactor_testIdent = parse parseFactor "" "x"
-parsefactor_testFunct = parse parseFactor "" "fib(2,3,ya)"
-parsefactor_testIfexpr = parse parseFactor "" "int ?(2<x){2+x}{2+3}"
 
 
 
@@ -216,7 +217,7 @@ parseIfCom :: Parser Commands
 parseIfCom = IfCom <$> (reserved "if" *> parens parseCondition)
           <*>  parseBlock
           <*>  parseBlock
-parseIfCom_tesst1 = parse parseIfCom "" "if(2==2){x=2;}{nop;}"
+parseIfCom_tesst1 = parse parseIfCom "" "if (x >=2) { print x;}{ print 2;}"
 parseIfCom_tesst2 = parse parseIfCom ""  "if (from >= amount) { from -= amount; to += amount;} {};"
 parseIfCom_tesst3 = parse parseIfExpr "" "?(2==2){x =2}{x =4}"
 

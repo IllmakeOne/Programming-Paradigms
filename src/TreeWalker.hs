@@ -179,7 +179,7 @@ typeCheckProgram [] _ = []
 typeCheckProgram_test stg =
   typeCheckProgram (fromStCL stg) (treeBuilder (fromStCL stg) 1 [])
 
-typeCheckProgram_test1 = typeCheckProgram_test "{ int x = 0; int y = 2; int z = x+y; print x;}"
+typeCheckProgram_test1 = typeCheckProgram_test "{ int x = 0; bool y = 2; bool z = y+ya; print x;}"
 typeCheckProgram_test2 = typeCheckProgram_test "{ int x = 0; int y = 2; int z = ya; print x;}"
 typeCheckProgram_test3 = typeCheckProgram_test "{ while(ya >= 2){ int x;};}"
 typeCheckProgram_test4 = typeCheckProgram_test "{ func int fib(int x,& int y){return 0}; int x = fib (2, nu);}"
@@ -190,7 +190,8 @@ aux= parse parseBlock " " "{ int x; bool y; x = 2 + ya; } "
 -- used in -> typeCheckProgram
 typeCheck :: [DataBase] -> Commands -> TypeError
 typeCheck db (VarDecl typ ex) | typeArgtype typ == (getType$ typeExpr ex db) = Ok
-                              | otherwise = Er ("VarDecl " ++ stringArtgType typ ++ " wrong type assigned")
+                              | boolTypeError (typeExpr ex db) = Er  ("VarDecl " ++ stringArtgType typ ++ " wrong type assigned")
+                              | otherwise = addMessage ("VarDecl " ++ stringArtgType typ) (typeExpr ex db)
 typeCheck db (GlobalVarDecl typ ex) | typeArgtype typ == (getType$ typeExpr ex db) = Ok
                               | otherwise = Er  ("GlobalVarDecl " ++ stringArtgType typ ++ " wrong type assigned")
 typeCheck db fun@(FunCall name exprs) | findinDb name db == SimplyNull && boolTypeError (checkCorrectFuncCommand db fun)= Ok
@@ -231,6 +232,7 @@ typeCheck_test_mincom1 = typeCheckProgram_test "{ bool x; x-= 2+ya;}"
 typeCheck_test_mincom2 = typeCheckProgram_test "{ int x; x-= ya;}"
 typeCheck_test_while1 = typeCheckProgram_test "{ while(ya >= 2){ int x;};}"
 typeCheck_test_ifcomand = typeCheckProgram_test "{ if(ya >= 2){ int x;}{};}"
+typeCheck_test_ifexpr = typeCheckProgram_test "{ int x = int ?(2==ya){2}{2} ;}"
 
 
 -- this methdos takes and expression and the database and returns the expression's type
@@ -258,8 +260,17 @@ typeExpr (Min e1 e2 ) db | not (t1 == t2) = Er "Substractions elemets are not th
         where
           t1 = typeExpr e1 db
           t2 = typeExpr e2 db
-typeExpr (IfExpr typ cond _ _ ) db | boolTypeError$ typeCheckCondition cond db =Crt  typ
-                                   | otherwise = Er "Condition types not the same in IfExpr"
+typeExpr (IfExpr typ cond e1 e2 ) db | cmp2 && cmp3 && conCorrectness = Crt  typ
+                                     | cmp2 && cmp3 = Er "Condition types not the same in IfExpr"
+                                     | cmp2 && conCorrectness = Er "Second expr of IfExpr is wrong type"
+                                     | cmp3 && conCorrectness = Er "First expr of IfExpr is wrong type"
+                                     | otherwise = Er "Both exprs in IfExpr are wrong"
+        where
+          t1 = getType $  typeExpr e1 db
+          t2 = getType $ typeExpr e2 db
+          cmp2 = t1 == typ
+          cmp3 = t2 == typ
+          conCorrectness = boolTypeError (typeCheckCondition cond db)
 typeExpr (Identifier x ) db = Crt$ findinDb x db
 typeExpr fun@(Funct name exprs) db | checkCorrectFuncExpr db fun = Crt$ findinDb name db
                                    | otherwise = Er "Function's arguments are not correct in FuncExpr"
