@@ -29,7 +29,7 @@ genBlock [] _ = []
 -- Here span funcdecl commands
 genBlock commands smTable = jumpOverFuncs -- gen x smTable ++ genBlock xs smTable
                             ++ generatedFunctions
-                            ++  genCommands body smTable ++ (traceShow fnTable) []
+                            ++ genCommands body smTable ++ (traceShow fnTable) []
   where
     (functions, body) = partition isFunction commands
     (generatedFunctions, fnTable)  = genFuncs functions smTable (length jumpOverFuncs) []
