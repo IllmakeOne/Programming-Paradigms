@@ -18,7 +18,7 @@ import Structure
 --    and two integers, the first one is the scope of the vribale the second is the offset
 -- DBF which is for the functions declared in the program
 --    it keeps track of the method's name and type in ArgType and it's parameters
-data DataBase = DB ArgType Int Int | DBF ArgType [Param] Bloc
+data DataBase = DB ArgType Int Int | DBF ArgType [Param] Int
       deriving (Eq,Show)
 
 --String to Command List
@@ -67,7 +67,7 @@ treeBuilder ((FunDecl arg args bloc):xs) scope off | checkDuplicant db arg scope
     where
       db = treeBuilder xs scope off
       ownscope = treeBuilder (fromBlock bloc) (scope+1) (increaseOffset off (scope+1))
-      add = (DBF arg args bloc)
+      add = (DBF arg args (-1))
       blocReturn = (findRetinBloc $ fromBlock bloc) --the return command of the method
       ret | typeArgtype arg == SimplyNull && blocReturn == (Return NullExpr) = SimplyNull
           | typeArgtype arg == SimplyNull && not (blocReturn == (Return NullExpr)) = error "Void methods has return"
@@ -217,7 +217,7 @@ typeExpr (IfExpr typ cond _ _ ) db | typeCheckCondition cond db = typ
 typeExpr (Identifier x ) db = findinDb x db
 typeExpr fun@(Funct name exprs) db | checkCorrectFuncExpr db fun = findinDb name db
                                    | otherwise = error "Function's arguments are not correct in FuncExpr"
-
+typeExpr _ _ = SimplyNull
 
 --this methods looks in the database for a namse and returns its type
 -- used in determining a exprssion's type -> typeExpr

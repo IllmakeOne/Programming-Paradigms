@@ -1,7 +1,14 @@
 {
 int jesse = 1000;
 
-func int add(& int jesse) {
+func void add(& int jesse) {
+    jesse += 3;
+    print jesse;
+};
+print jesse;
+
+
+func void koekjes(& int jesse) {
     jesse += 3;
     print jesse;
 };

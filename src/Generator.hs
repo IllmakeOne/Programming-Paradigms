@@ -7,6 +7,7 @@ import Structure
 import Text.Parsec.String
 import Data.Maybe
 import Debug.Trace
+import Data.List
 --Block [VarDecl (Arg SimplyInt "jesse") (Constant 1000),
 -- GlobalVarDecl (Arg SimplyInt "robert") (Constant 1000),
 -- VarDecl (Arg SimplyInt "marieke") (Constant 5000),FunDecl (Arg SimplyInt "transfer") [ByRef (Arg SimplyInt "from"),ByRef (Arg SimplyInt "to"),ByVal (Arg SimplyInt "amount")] (Block [IfCom (Gq (Identifier "from") (Identifier "amount")) (Block [MinCom "from" (Identifier "amount"),AddCom "to" (Identifier "amount"),End]) (Block [End]),End]),FunDecl (Arg SimplyNull "helicopterMoney") [ByVal (Arg SimplyInt "to"),ByVal (Arg SimplyInt "amount")] (Block [AddCom "to" (Identifier "amount"),While (Lt (Identifier "to") (Identifier "robert")) (Block [AddCom "to" (Identifier "amount"),End]),End]),Fork (Block [FunCall "helicopterMoney" [Identifier "jesse",Constant 9000],End]
@@ -22,18 +23,102 @@ generation xs = genBlock commands smTable ++ [EndProg]
 -- generationHelper xs smTable |length xs > 1 = genBlock xs smTable
 --                             |otherwise = [EndProg]
 
+-- Generate a new block. First it generates the inner functions, so you can call
+--  them earlier, before they are actually defined in the AST. The first thing
+--  will determine if we need to jump over the declared functions or not, and then
+--- generates the main body parts.
 genBlock :: [Commands] -> [DataBase] -> [Instruction]
 genBlock [] _ = []
 -- Here span funcdecl commands
-genBlock commands smTable = (traceShow smTable) [Sprockell.Nop] -- gen x smTable ++ genBlock xs smTable
+genBlock commands smTable = jumpOverFuncs -- gen x smTable ++ genBlock xs smTable
+                            ++ generatedFunctions
+                            ++  genCommands body smTable ++ (traceShow fnTable) []
   where
-    (functions, main) = span isFunction commands
+    (functions, body) = partition isFunction commands
+    (generatedFunctions, fnTable)  = genFuncs functions smTable (length jumpOverFuncs) []
+    jumpOverFuncs = jumpOrNot (length generatedFunctions + length functions)
 
+
+genFuncs :: [Commands] -> [DataBase] -> Int -> [(String, Int)] -> ([Instruction] , [(String, Int)])
+genFuncs [] _ _ fnTable = ([], fnTable)
+genFuncs (x:xs) smTable offs fnTable = (instructions ++ otherInstructions, finalFnTable)
+  where
+    (instructions, newFnTable)    = genFunc x smTable offs fnTable
+    (otherInstructions, finalFnTable) = genFuncs xs smTable (offs + length instructions + 1) newFnTable
+
+genFunc :: Commands -> [DataBase] -> Int -> [(String, Int)] -> ([Instruction] , [(String, Int)])
+genFunc (FunDecl (Arg ftype fname) params body) smTable startOffs fnTable=
+  ([ Debug ("func: " ++ fname),
+    Load (ImmValue (1 + 3 * length params)) regA,
+    Compute Sub regF regA regA, -- 2. set the value of the ARP
+    Load (IndAddr reg0) regD, -- 3. amount of parameters already passed down
+
+    ComputeI Sprockell.Gt regD (length params ) regE, -- 4.  LOOP check if all parameters are passed
+    Branch regE (Rel 7), -- 5. then skip this parameter loading below
+
+    Load (IndAddr regA) regB, -- 6. Load the actual parameter value
+    Compute Sprockell.Add regF regD regE, -- 7. Store the address in the local data
+    Store regB (IndAddr regE), -- 8.
+    Compute Sprockell.Incr regD regD regD, -- 9.
+    ComputeI Sprockell.Add regA 3 regA, -- 10.
+
+    Jump (Rel (-7))] -- 11. go back to  LOOP
+    ++ genBlock (fromBlock body) smTable
+
+    ++ [Load (ImmValue (3 * length params)) regA,
+       Compute Sub regF regA regA,
+       ComputeI Sprockell.Add reg0 1 regD,
+
+       ComputeI Sprockell.Gt regD (length params) regE, -- LOOP
+       Branch regE (Rel 23), -- then jump over this shit
+       Compute Sprockell.Add regF regD regE,
+       Load (IndAddr regE) regC,
+       Load (IndAddr regA) regB,
+       Compute Sprockell.Lt regB reg0 regE, -- check if it is correct
+       Branch regE (Rel 2),
+       Store regC (IndAddr regB), -- then save in address
+       Compute Sprockell.Incr regA reg0 regA, -- move pointr to global
+       Branch regE (Rel 10),
+
+       Compute Sprockell.Add regB reg0 regE, -- lock address
+       TestAndSet (IndAddr regE),
+       Receive regE,
+       Branch regE (Rel 2), -- go back if lock fails
+       Jump (Rel (-4)),
+       ComputeI Sprockell.Add regB 1 regB,
+
+       WriteInstr regC (IndAddr regB),
+       ComputeI Sub regB 1 regB, --Unlock
+       Compute Sprockell.Incr  regD regD regD, --add one to D
+       ComputeI Sprockell.Add regA 2 regA,
+       Jump (Rel (-23)), -- Go back to the LOOP
+
+       Compute Sprockell.Decr regF reg0 regA,
+       Load (IndAddr regA) regE, -- get the return address
+       Load (IndAddr regF) regF, -- restore arp
+       Debug ("func: " ++ fname ++ " end! We're only going to jump!"),
+       Jump (Ind regE) -- jump to da return address
+       ], (fname, startOffs) : fnTable)
+
+genFunc command smTable _ fnTable = (gen command smTable, fnTable)
+
+updateSmTable :: [DataBase] -> String -> Int -> [DataBase]
+updateSmTable [] _ _ = []
+updateSmTable (DBF (Arg ftype dbfname) params initOffset : xs) fname offset |
+  dbfname == fname = (DBF (Arg ftype dbfname) params offset) : updateSmTable xs fname offset
+updateSmTable (other:xs) fname offset = other : updateSmTable xs fname offset
+
+jumpOrNot :: Int -> [Instruction]
+jumpOrNot 0 = []
+jumpOrNot i = [Jump (Rel i)]
 
 isFunction :: Commands -> Bool
-isFunction (FunDecl _ _ _) = True
+isFunction FunDecl{} = True
 isFunction _ = False
 
+genCommands :: [Commands] -> [DataBase] -> [Instruction]
+genCommands [] _ = []
+genCommands (x:xs) smTable = gen x smTable ++ genCommands xs smTable
 
 -- ALSO OPEN A NEW SCOPE!!!
 
@@ -89,64 +174,8 @@ gen (AddCom varName expr) smTable = genVar varName expr (Just Sprockell.Add) smT
 -- Same as before, Generate code for -= statements
 gen (MinCom varName expr) smTable = genVar varName expr (Just Sprockell.Sub) smTable
 
--- Generate a function declaration
--- gen (FunDecl fType params body) smTable =
---   -- First jump over it, as we don't want to evaluate it immideatly but store the location in main memory.
---   [Jump (Rel (length funcDeclGen + 1)), Load (Push (Rel 0)] ++ funcDeclGen
---   where
---     funcDeclGen = []
-    -- Function declarations need to be at a fixed spot, so you know where to return to.
-
-    --[Debug "FuncDecl", Load (ImmValue (1 + 3 * length params)) regA, -- 1. TODO IS 3 a good choice?
-    --    Compute Sub regF regA regA, -- 2. set the value of the ARP
-    --    Load (IndAddr reg0) regD, -- 3. amount of parameters already passed down
-    --
-    --    ComputeI Sprockell.Gt regD (length params ) regE, -- 4.  LOOP check if all parameters are passed
-    --    Branch regE (Rel 7), -- 5. then skip this parameter loading below
-    --
-    --    Load (IndAddr regA) regB, -- 6. Load the actual parameter value
-    --    Compute Sprockell.Add regF regD regE, -- 7. Store the address in the local data
-    --    Store regB (IndAddr regE), -- 8.
-    --    Compute Sprockell.Incr regD regD regD, -- 9.
-    --    ComputeI Sprockell.Add regA 3 regA, -- 10.
-    --
-    --    Jump (Rel (-7))] -- 11. go back to  LOOP
-    --    ++ genBlock (fromBlock body) smTable
-
-       -- ++ [Load (ImmValue (1 - 1 + 3 * length params)) regA,
-       --     Compute Sub regF regA regA,
-       --     ComputeI Sprockell.Add reg0 1 regD,
-       --
-       --     ComputeI Sprockell.Gt regD (length params) regE, -- LOOP
-       --     Branch regE (Rel 23), -- then jump over this shit
-       --     Compute Sprockell.Add regF regD regE,
-       --     Load (IndAddr regE) regC,
-       --     Load (IndAddr regA) regB,
-       --     Compute Sprockell.Lt regB reg0 regE, -- check if it is correct
-       --     Branch regE (Rel 2),
-       --     Store regC (IndAddr regB), -- then save in address
-       --     Compute Sprockell.Incr regA reg0 regA, -- move pointr to global
-       --     Branch regE (Rel 10),
-       --
-       --     Compute Sprockell.Add regB reg0 regE, -- lock address
-       --     TestAndSet (IndAddr regE),
-       --     Receive regE,
-       --     Branch regE (Rel 2), -- go back if lock fails
-       --     Jump (Rel (-4)),
-       --     ComputeI Sprockell.Add regB 1 regB,
-       --
-       --     WriteInstr regC (IndAddr regB),
-       --     ComputeI Sub regB 1 regB, --Unlock
-       --     Compute Sprockell.Incr  regD regD regD, --add one to D
-       --     ComputeI Sprockell.Add regA 2 regA,
-       --     Jump (Rel (-23)), -- Go back to the LOOP
-       --
-       --     Compute Sprockell.Decr regF reg0 regA,
-       --     Load (IndAddr regA) regE, -- get the return address
-       --     Load (IndAddr regF) regF, -- restore arp
-       --     Jump (Ind regE)] -- jump to da return address
--- gen (FunCall funcName expressions) =
---   [Compute Add regF ]
+-- Generate a new function
+gen (FunDecl (Arg ftype fname) params body) smTable = error "funDecl should not be defined in the gen method"
 
 -- Generate a value with an expression, and maybe an additional calculation
 genVar :: String -> Expr -> Maybe Operator -> [DataBase] -> [Instruction]
@@ -239,7 +268,7 @@ codeGenTest = do
     Left err -> print err
     Right xs -> do
       print code
-      -- run [code]
+      --run [code]
       where
         code = generation xs
 
