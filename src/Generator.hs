@@ -8,9 +8,6 @@ import Text.Parsec.String
 import Data.Maybe
 import Debug.Trace
 import Data.List
---Block [VarDecl (Arg SimplyInt "jesse") (Constant 1000),
--- GlobalVarDecl (Arg SimplyInt "robert") (Constant 1000),
--- VarDecl (Arg SimplyInt "marieke") (Constant 5000),FunDecl (Arg SimplyInt "transfer") [ByRef (Arg SimplyInt "from"),ByRef (Arg SimplyInt "to"),ByVal (Arg SimplyInt "amount")] (Block [IfCom (Gq (Identifier "from") (Identifier "amount")) (Block [MinCom "from" (Identifier "amount"),AddCom "to" (Identifier "amount"),End]) (Block [End]),End]),FunDecl (Arg SimplyNull "helicopterMoney") [ByVal (Arg SimplyInt "to"),ByVal (Arg SimplyInt "amount")] (Block [AddCom "to" (Identifier "amount"),While (Lt (Identifier "to") (Identifier "robert")) (Block [AddCom "to" (Identifier "amount"),End]),End]),Fork (Block [FunCall "helicopterMoney" [Identifier "jesse",Constant 9000],End]
 
 generation :: Bloc -> [Instruction]
 generation xs = genBlock commands smTable ++ [EndProg]
@@ -44,7 +41,7 @@ genFuncs [] _ _ fnTable = ([], fnTable)
 genFuncs (x:xs) smTable offs fnTable = (instructions ++ otherInstructions, finalFnTable)
   where
     (instructions, newFnTable)    = genFunc x smTable offs fnTable
-    (otherInstructions, finalFnTable) = genFuncs xs smTable (offs + length instructions + 1) newFnTable
+    (otherInstructions, finalFnTable) = genFuncs xs smTable (offs + length instructions) newFnTable
 
 genFunc :: Commands -> [DataBase] -> Int -> [(String, Int)] -> ([Instruction] , [(String, Int)])
 genFunc (FunDecl (Arg ftype fname) params body) smTable startOffs fnTable=
@@ -267,10 +264,17 @@ codeGenTest = do
   case result of
     Left err -> print err
     Right xs -> do
-      print code
+      putStrLn (pretty code) -- print code
       --run [code]
       where
         code = generation xs
+
+pretty :: [Instruction] -> String
+pretty = pretty' 0
+
+pretty' :: Int -> [Instruction] -> String
+pretty' _ [] = ""
+pretty' i (x:xs) = show i ++ ":    " ++ show x ++ "\n" ++ pretty' (i+1) xs
 
 showLocalMem :: DbgInput -> String
 showLocalMem ( _ , systemState ) = show $ localMem $ head $ sprStates systemState
