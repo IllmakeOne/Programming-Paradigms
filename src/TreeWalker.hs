@@ -76,11 +76,11 @@ symbolTableBuilder ((GlobalVarDecl arg expr):xs) scope off |boolTypeError dupTes
 symbolTableBuilder ((FunDecl arg param bloc):xs) scope off
                               | boolTypeError dupTest == False =(Err arg dupTest) : db
                               | boolTypeError ret == False = Err arg ret  :db
-                              | typeArgtype arg == getType ret = add:ownscope ++ db
+                              | ( traceShowId$ typeArgtype arg) == (traceShowId $getType ret) = add:ownscope ++ db
                               | not(typeArgtype arg == SimplyNull) && getType ret == SimplyNull
                                           -- = Err arg (Er  "Return type of methods not same type and methods type "):db
                                           = (Err arg (Er "Method has no return, and it should ")) : db
-                              | otherwise = Err arg (Er  "Return type of methods not same type and methods type "):db
+                              | otherwise = Err arg (Er  "Return type of method not same type and method's type "):db
     where
       dupTest= checkDuplicant db arg scope
       db = symbolTableBuilder xs scope off
@@ -104,6 +104,7 @@ fundecl_err2 = checkCorrectProgram "{ func bool fib (& int x) { };fib(x); }"
             == (False,[Err (Arg SimplyNull "") (Er "No params because didnt find method "),Err (Arg SimplyBol "fib") (Er "Method has no return, and it should ")])
 fundecl_err3 = checkCorrectProgram "{ func bool fib (& int x) { return ya;};fib(x); }"
             == (False,[Err (Arg SimplyNull "") (Er "Non void methods called ")])
+fundecl_err4 = checkCorrectProgram "{ global int jesse = 1000;func int add(int amount) { amount += 1; return amount;};jesse = add(3); print jesse;}" == (True,[])
 
 -- auxiliary method used in -> symbolTableBuilder FuncDecl case
 --  it creates variable declaration commnad out fo the parameters
@@ -148,6 +149,8 @@ symbolTableBuilder_test4 = symbolTableBuilder_fromStg
 symbolTableBuilder_test5 = symbolTableBuilder_fromStg
       "{ func void fib(& int x, int y, int z){ return y; }; }"
         == [Err (Arg SimplyNull "fib") (Er "Void method with return")]
+symbolTableBuilder_test6 = symbolTableBuilder_fromStg
+                  "{ func int add(int amount) { amount += 1; return amount;};}"
 
 
 --this methods is used to get the current offset of a given scope 'x'
@@ -179,13 +182,14 @@ findRetinBloc (x:xs) = findRetinBloc xs
 -- methods used in -> exprTypeFromRet
 addByrefParamsDb :: [Param] -> Int ->[(Int, Int)]  -> [DataBase]
 addByrefParamsDb [] _ _ = []
-addByrefParamsDb ((ByVal _):ps) scope off = addByrefParamsDb ps scope off
+addByrefParamsDb ((ByVal arg):ps) scope off =
+      (DB arg (scopesTracker (increaseOffset off scope) scope) scope):addByrefParamsDb ps scope (increaseOffset off (scope+1))
 addByrefParamsDb ((ByRef arg):ps) scope off =
       (DB arg (scopesTracker (increaseOffset off scope) scope) scope):addByrefParamsDb ps scope (increaseOffset off (scope+1))
 addByrefParamsDb_tes1 = addByrefParamsDb [ByVal (Arg SimplyInt "x"),ByRef (Arg SimplyInt "y")] 1 [(0,0)]
 
 
---method that puts together the current database and the DB entries of a blok of a methods, and the methods;s parameters
+--method that puts together the current database and the DB entries of the block of a methods, and the methodss parameters
 --methods used in ->  symbolTableBuilder for fundecl for checking if a method has the corret  return type
 --this is done because in some cases the return is one fo the parameters
 exprTypeFromRet ::[DataBase] -> [Param] ->Bloc -> Commands -> Type
@@ -316,6 +320,9 @@ typeCheck db (IfCom cond bloc1 bloc2) | boolTypeError$ condCheck = Ok
         ret1 = findRetinBloc$ fromBlock bloc1
         ret2 = findRetinBloc$ fromBlock bloc2
 typeCheck _ _ = Ok
+
+
+
 
 ----------Tests which tests if the correct error arises-------------------
 typeCheck_test_vadecl1 = runChecksfromString "{ int x = ya;}" == [Er "VarDecl x wrong type assigned"]
