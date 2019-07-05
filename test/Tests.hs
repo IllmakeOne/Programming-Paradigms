@@ -6,6 +6,7 @@ import BasicParsers
 import Structure
 import Text.ParserCombinators.Parsec
 -- import Data
+import TreeWalkerTests
 
 
 data ParseTest =  ParseT { testName :: String, testParse :: Bool }
