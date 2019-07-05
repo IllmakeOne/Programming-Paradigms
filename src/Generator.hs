@@ -260,7 +260,7 @@ gen (AddCom varName expr) tCount smTable fnTable offset = genVar varName expr (J
 gen (MinCom varName expr) tCount smTable fnTable offset = genVar varName expr (Just Sprockell.Sub) tCount smTable fnTable offset
 gen (FunCall fName params) tCount smTable fnTable offset = (offset + length code, code ++ popOrNot smTable fName) -- Dont jump over the popOrNot so didnt put that in the offset
   where
-    (offs, code) = genFunction fName params tCount smTable fnTable offset  --(offset + length code - length popper , code) -- Minus popper to first pop it when the functionn is not void
+    (offs, code) = genFunctionCall fName params tCount smTable fnTable offset  --(offset + length code - length popper , code) -- Minus popper to first pop it when the functionn is not void
 --   where
 --     code =
 --           [Debug "joehoe funcall:"]
@@ -281,7 +281,31 @@ gen (FunCall fName params) tCount smTable fnTable offset = (offset + length code
 -- Generate the return expression
 gen (Return expr) tCount smTable fnTable offset = genExpr expr tCount smTable fnTable offset
 -- Generate a new function
-gen (FunDecl (Arg ftype fname) params body) _ _ _ _ = error "funDecl should not be defined in the gen method"
+gen FunDecl{} _ _ _ _ = error "Generator: funDecl should not be defined in the gen method"
+-- gen (Fork fName params) tCount smTable fnTable offset = (offset + length code, code)
+--   where
+--     code = [TestAndSet (DirAddr 1), -- writelo
+--              Receive regE,
+--              Branch regE (Rel 2) -- yay
+--              Jump (Rel (-3))] -- no we go back to get the writelock
+--            ++ genFunParams params tCount smTable fnTable offset
+--            [ Load (ImmValue 5) regC
+--            ++ (forkArgRecords astArgs variables globals threads) ++
+--            [Load (ImmValue (length astArgs)) regD,
+--            WriteInstr regD (DirAddr fork_record_argc),
+--            , Debug ("**c" ++ pName)        -- line of jump addr. is not known
+--            , Debug ""
+--            , Pop regD
+--            , WriteInstr regD (DirAddr fork_record_jump)
+--            , WriteInstr reg0 (DirAddr fork_record_rd)
+--
+--            , Load (ImmValue fork_record_wr) regB
+--                                            -- load write lock address
+--            , ReadInstr (IndAddr regB)      -- peek at writeLock
+--            , Receive regE
+--            , Branch regE (Rel 2)           -- if zero: continue;
+--            , Jump (Rel (-3))               -- otherwise wait for thread to start our fork instance
+--            ]
 
 popOrNot :: [DataBase] -> String -> [Instruction]
 popOrNot smTable fName | funcPoppable smTable fName = [Pop reg0]
@@ -438,12 +462,12 @@ genExpr (IfExpr _ cond exp1 exp2) tCount smTable fnTable offset = (offset + leng
                         ] ++ genExp1 ++ [Jump (Rel (length genExp2 + 1))] ++ genExp2
     (ex1offS, genExp1) = genExpr exp1 tCount smTable fnTable (condOffs + 3) -- + 3 for everything before genExp1
     (ex2offS, genExp2) = genExpr exp2 tCount smTable fnTable (ex1offS + 1) -- + 1
-genExpr (Funct fName params) tCount smTable fnTable offset = genFunction fName params tCount smTable fnTable offset
+genExpr (Funct fName params) tCount smTable fnTable offset = genFunctionCall fName params tCount smTable fnTable offset
 -- Else error out
 genExpr _ _ _ _ _ = error "Generator: this genExpr type error not implemented"
 
-genFunction :: String -> [Expr] -> Int -> [DataBase] -> [(String, Int)] -> Int -> (Int, [Instruction])
-genFunction fName params tCount smTable fnTable offset = (offset + length code, code)
+genFunctionCall :: String -> [Expr] -> Int -> [DataBase] -> [(String, Int)] -> Int -> (Int, [Instruction])
+genFunctionCall fName params tCount smTable fnTable offset = (offset + length code, code)
   where
     code = [Debug "joehoe funcall:"]
       ++ genFunParams params tCount smTable fnTable offset
@@ -515,7 +539,7 @@ getOffset2 smTable name = (x, y)
 
 --------- DEBUG REMOVE WHEN DONE!!
 codeGenTest = do
-  result <- parseFromFile parseBlock "../examples/functest2.amv"
+  result <- parseFromFile parseBlock "../examples/functest3.amv"
   case result of
     Left err -> print err
     Right xs -> do
