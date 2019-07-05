@@ -98,11 +98,21 @@ symbolTableBuilder ((Fork bloc):xs) scope off =
 symbolTableBuilder (x:xs) scope off = symbolTableBuilder xs scope off
 
 
+-- auxiliary method used in -> symbolTableBuilder FuncDecl case
+--  it creates variable declaration commnad out fo the parameters
+--so they can be easily introduced in the scope of the methods
 paramtoCom :: [Param] -> [Commands]
 paramtoCom [] = []
 paramtoCom ((ByVal arg):xs) = VarDecl arg NullExpr : paramtoCom xs
-paramtoCom ((ByRef arg):xs) = paramtoCom xs
+paramtoCom ((ByRef arg):xs) = VarDecl arg NullExpr : paramtoCom xs
 
+--checks if by referece parameters are not simplke values
+checkRefParam :: [Param] -> [Expr]-> TypeError
+checkRefParam [] []= Ok
+checkRefParam ((ByRef (Arg typ name)):ps) ((Constant i):ex) = checkRefParam ps ex
+checkRefParam ((ByRef (Arg typ name)):ps) (_:ex) = Er "Param by referece is given an expression"
+checkRefParam (p:ps) (e:es) = checkRefParam ps es
+-- checkRefParam_test = []
 
 --this methods takes a string , parses it and then creates the symbol table for it, withtout the type errros
 symbolTableBuilder_fromStg :: String -> [DataBase]
@@ -118,10 +128,10 @@ symbolTableBuilder_test2 = symbolTableBuilder_fromStg
 symbolTableBuilder_test3 = showErrorinDB$ symbolTableBuilder_fromStg
       "{ func int fib (int x) { print x;}; fib(2); }"
 delete2 = parse parseBlock "" "{ int x; func int fib(& int x, int y){ print y; }; }"
+
+--this method was used to test if the parameters are correclty added to the function's scopes
 symbolTableBuilder_test4 = symbolTableBuilder_fromStg
-                  "{ int x; func void fib(& int x, int y, int z){ return y; }; }"
-
-
+                  "{ int x; func void fib(& int x, int y, int z){ return y; };int z =2; }"
 
 --this methods is used to get the current offset of a given scope 'x'
 scopesTracker :: [(Int,Int)] ->Int ->Int
@@ -285,7 +295,8 @@ typeCheck_test_globalvadecl1 = runChecksfromString "{ global int x = ya;}"
             == [Er "GlobalVarDecl x wrong type assigned"]
 typeCheck_test_globalvadecl2 = runChecksfromString "{ global bool x = 2+4*2;}"
             == [Er "GlobalVarDecl x wrong type assigned"]
-typeCheck_test_funcall1 = runChecksfromString "{ func int fib(int x){ int y; return y;}; int x = fib(2);}" == []
+typeCheck_test_funcall1 = runChecksfromString "{ func int fib(int x){ int y; return y;}; int x = fib(2);}"
+            == []
 typeCheck_test_funcall2 = runChecksfromString "{ func void fib(int x){ int y;}; fib(2,3);}"
             == [Er "Function's arguments are not correct in Funcall fib"]
 typeCheck_test_funcall3 = runChecksfromString "{ func int fib(int x){ int y;return y; }; fib(2);}"
