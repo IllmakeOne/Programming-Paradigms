@@ -202,8 +202,8 @@ parseGlobalVarDecl_testint2 = parse parseGlobalVarDecl "" "global int x = 1;" ==
 --parses assignment
 parseAss:: Parser Commands
 parseAss = try (Ass<$>identifier<*>(reservedOp "=" *> parseExpr))
-parseAss_test1 = parse parseAss "" "x = 2;"
-parseAss_test2 = parse parseAss "" "x = fib(2);"
+parseAss_test1 = parse parseAss "" "x = 2;" == Right (Ass "x" (Constant 2))
+parseAss_test2 = parse parseAss "" "x = fib(2);" == Right (Ass "x" (Funct "fib" [Constant 2]))
 
 --parses If Command, this type of if does not have a return
 parseIfCom :: Parser Commands
@@ -211,61 +211,68 @@ parseIfCom = IfCom <$> (reserved "if" *> parens parseCondition)
           <*>  parseBlock
           <*>  parseBlock
 parseIfCom_tesst1 = parse parseIfCom "" "if (x >=2) { print x;}{ print 2;}  "
+          == Right (IfCom (Gq (Identifier "x") (Constant 2)) (Block [Print (Identifier "x"),End]) (Block [Print (Constant 2),End]))
 parseIfCom_tesst2 = parse parseIfCom ""  "if (from >= amount) { from -= amount; to += amount;} {};"
-parseIfCom_tesst3 = parse parseIfExpr "" "?(2==2){x =2}{x =4}"
+          == Right (IfCom (Gq (Identifier "from") (Identifier "amount")) (Block [MinCom "from" (Identifier "amount"),AddCom "to" (Identifier "amount"),End]) (Block [End]))
+
 
 --parses Nop, which is no operation
 parseNop:: Parser Commands
 parseNop = (reserved "nop"  >> return Nop )
-parsenop_test1 = parse parseNop "" "nop"
+parsenop_test1 = parse parseNop "" "nop" == Right Nop
 
 --parses minus command
 parseMinCom :: Parser Commands
 parseMinCom = (MinCom <$> identifier <*>(reservedOp "-=" *>parseExpr))
-parseMinCom_test1 = parse parseMinCom "" "x -= 2+3;"
+parseMinCom_test1 = parse parseMinCom "" "x -= 2+3;" == Right (MinCom "x" (Add (Constant 2) (Constant 3)))
 
 --parses add command
 parseAddCom :: Parser Commands
 parseAddCom = (AddCom <$> identifier <*>(reservedOp "+=" *>parseExpr))
-parseAddCom_test1 = parse parseAddCom "" "x += 2+3;"
+parseAddCom_test1 = parse parseAddCom "" "x += 2+3;" == Right (AddCom "x" (Add (Constant 2) (Constant 3)))
 
 --parses increment command
 parseIncr :: Parser Commands
 parseIncr = (Incr <$> identifier <*reservedOp "++")
-parseIncr_test1 = parse parseIncr "" "x ++;"
+parseIncr_test1 = parse parseIncr "" "x ++;" == Right (Incr "x")
 
 --parses decrese command
 parseDecr :: Parser Commands
 parseDecr = (Decr <$> identifier <*reservedOp "--")
-parseDecr_test1 = parse parseDecr "" "x --;"
+parseDecr_test1 = parse parseDecr "" "x --;" == Right (Decr "x")
 
 --parses print command
 parsePrint :: Parser Commands
 parsePrint = (Print <$>(reserved "print"*>parseExpr))
-parsePrint_test1 = parse parsePrint "" "print 2;"
+parsePrint_test1 = parse parsePrint "" "print 2;" == Right (Print (Constant 2))
 parsePrint_test2 = parse parsePrint "" "print int ?(2<x){2+x}{2+3};"
+        == Right (Print (IfExpr SimplyInt (Lt (Constant 2) (Identifier "x")) (Add (Constant 2) (Identifier "x")) (Add (Constant 2) (Constant 3))))
 
 --parses function declaration
 parseFunDecl :: Parser Commands
 parseFunDecl = try (FunDecl <$> (reserved "func" *> parseArgTypeVoid)
                     <*> parens params <*>parseBlock)
-parseFunDecl_test1 = parse parseFunDecl "" "func int theStuff(int a, bool b){ int x = a;}"
+parseFunDecl_test1 = parse parseFunDecl "" "func int theStuff(int a, & bool b){ int x = a;}"
+        == Right (FunDecl (Arg SimplyInt "theStuff") [ByVal (Arg SimplyInt "a"),ByRef (Arg SimplyBol "b")] (Block [VarDecl (Arg SimplyInt "x") (Identifier "a"),End]))
 parseFunDecl_test2 = parse parseFunDecl "" "func void theStuff(int a, bool b){ int x = a;}"
+        == Right (FunDecl (Arg SimplyNull "theStuff") [ByVal (Arg SimplyInt "a"),ByVal (Arg SimplyBol "b")] (Block [VarDecl (Arg SimplyInt "x") (Identifier "a"),End]))
 
 --parses one parameter of a function used in -> params
 parseParam:: Parser Param
 parseParam = try (ByRef <$> (reserved "&" *>parseArgType))
             <|> (ByVal <$> parseArgType)
-parseParam__test1 = parse parseParam "" "& int x"
-
+parseParam__test1 = parse parseParam "" "& int x" == Right (ByRef (Arg SimplyInt "x"))
+parseParam__test2 = parse parseParam "" "int x" == Right (ByVal (Arg SimplyInt "x"))
 --parses a list of arguments, used in -> parseFunDecl
 params :: Parser [Param]
 params = commaSep (parseParam)
 params_test1 = parse params "" "& bool h, \n int x, \n bool x"
+        == Right [ByRef (Arg SimplyBol "h"),ByVal (Arg SimplyInt "x"),ByVal (Arg SimplyBol "x")]
 
 
 bigtest = parse parseBlock ""
           "{ int jesse = 1000; global int robert = 1000; while(robert == 0){ jesse++;}; int marieke = 5000; func int transfer(& int from,& int to, int amount) { jesse++; if (from >= amount) { from -= amount; to += amount;} {};}; func void helicopterMoney(int to, int amount) { to += amount;  };  fork { helicopterMoney(jesse, 9000);};  fork { helicopterMoney(robert, 9000);}; join;  print  jesse;  };"
+          == Right (Block [VarDecl (Arg SimplyInt "jesse") (Constant 1000),GlobalVarDecl (Arg SimplyInt "robert") (Constant 1000),While (Eq (Identifier "robert") (Constant 0)) (Block [Incr "jesse",End]),VarDecl (Arg SimplyInt "marieke") (Constant 5000),FunDecl (Arg SimplyInt "transfer") [ByRef (Arg SimplyInt "from"),ByRef (Arg SimplyInt "to"),ByVal (Arg SimplyInt "amount")] (Block [Incr "jesse",IfCom (Gq (Identifier "from") (Identifier "amount")) (Block [MinCom "from" (Identifier "amount"),AddCom "to" (Identifier "amount"),End]) (Block [End]),End]),FunDecl (Arg SimplyNull "helicopterMoney") [ByVal (Arg SimplyInt "to"),ByVal (Arg SimplyInt "amount")] (Block [AddCom "to" (Identifier "amount"),End]),Fork (Block [FunCall "helicopterMoney" [Identifier "jesse",Constant 9000],End]),Fork (Block [FunCall "helicopterMoney" [Identifier "robert",Constant 9000],End]),Join,Print (Identifier "jesse"),End])
 
 
 

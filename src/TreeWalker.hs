@@ -133,26 +133,30 @@ symbolTableBuilder_fromStg string | isLeft parsed = error "Not parsed correctly 
 
 symbolTableBuilder_test1 = symbolTableBuilder_fromStg
       "{ global int z = 3 ;func int fib(bool x, & int y){ x =ya ;return y;}; int x = fib (ya, 2);func int fibi(int a, & int b){ a =2 ;return b;};}"
+      == [DB (Arg SimplyInt "z") 0 0,DBF (Arg SimplyInt "fib") [ByVal (Arg SimplyBol "x"),ByRef (Arg SimplyInt "y")] (Block [Ass "x" (BoolConst True),Return (Identifier "y"),End]),DB (Arg SimplyBol "x") 2 1,DB (Arg SimplyInt "y") 2 2,DB (Arg SimplyInt "x") 1 0,DBF (Arg SimplyInt "fibi") [ByVal (Arg SimplyInt "a"),ByRef (Arg SimplyInt "b")] (Block [Ass "a" (Constant 2),Return (Identifier "b"),End]),DB (Arg SimplyInt "a") 2 1,DB (Arg SimplyInt "b") 2 2]
 symbolTableBuilder_test2 = symbolTableBuilder_fromStg
       "{ global int a = 0 ;global bool b = ya; int c = 1; bool d; global bool e;func void aux(){ int b = 0;}; }"
-symbolTableBuilder_test3 = showErrorinDB$ symbolTableBuilder_fromStg
-      "{ func int fib (int x) { print x;}; fib(2); }"
-delete2 = parse parseBlock "" "{ int x; func void fib(& int x, int y, int z){ return y; };int z =2; }"
+-- symbolTableBuilder_test3 =( showErrorinDB symbolTableBuilder_fromStg
+--       "{ func int fib (int x) { print x;}; fib(2); }")
+--       == [Err (Arg SimplyInt "fib") (Er "Method has no return, and it should ")]
+delete2 = parse parseBlock "" "{ global int jesse = 1000;func int add(int amount) { amount += 1; return amount;};jesse = add(3);print jesse;}"
 
 --this method was used to test if the parameters are correclty added to the function's scopes
 symbolTableBuilder_test4 = symbolTableBuilder_fromStg
                   "{ int x; func int fib(& int x, int y, int z){ return y; };int z =2; }"
 -- this method was used to test if it correctly rejects FunCall wiht values instead of indetifies for pram by ref
 symbolTableBuilder_test5 = symbolTableBuilder_fromStg
-      "{ func void fib(& int x, int y, int z){ return y; } }"
+      "{ func void fib(& int x, int y, int z){ return y; }; }"
+        == [Err (Arg SimplyNull "fib") (Er "Void method with return")]
+
 
 --this methods is used to get the current offset of a given scope 'x'
 scopesTracker :: [(Int,Int)] ->Int ->Int
 scopesTracker [] _ = error "Could not find offeset of scope"
 scopesTracker ((a,b):xs) x | a == x = b
                            | otherwise = scopesTracker xs x
-scopesTracker_test1 = scopesTracker [(1,0),(2,4)] 2
-scopesTracker_test2 = scopesTracker [(1,0),(2,4)] 1
+scopesTracker_test1 = scopesTracker [(1,0),(2,4)] 2 == 4
+scopesTracker_test2 = scopesTracker [(1,0),(2,4)] 1 == 0
 
 --this methods is used to increment the offest of a scope 'x'
 --if the scope is not declared yet, declare it with offset 0
@@ -160,8 +164,8 @@ increaseOffset:: [(Int, Int)] -> Int -> [(Int, Int)]
 increaseOffset [] x = [(x,0)]
 increaseOffset ((a,b):xs) x | a == x = (a,(b+1)):xs
                             | otherwise = (a,b):increaseOffset xs x
-increaseOffset_test1 = increaseOffset [(1,0),(2,4)] 2
-increaseOffset_test2 = increaseOffset [] 2
+increaseOffset_test1 = increaseOffset [(1,0),(2,4)] 2 == [(1,0),(2,5)]
+increaseOffset_test2 = increaseOffset [] 2  == [(2,0)]
 
 --this methods seraches for the return in a list of commands
 -- used in -> symbolTableBuilder for fundecl for checking if a method has the corret  return type
@@ -303,10 +307,14 @@ typeCheck db (While cond _) | boolTypeError$ condCheck = Ok
                             | otherwise = addMessage "While" condCheck
       where
         condCheck = typeCheckCondition cond db
-typeCheck db (IfCom cond _ _) | boolTypeError$ condCheck = Ok
+typeCheck db (IfCom cond bloc1 bloc2) | boolTypeError$ condCheck = Ok
+                            | not$ (traceShowId ret1) == Return NullExpr = Er "First block of IfCom has return"
+                            | not$ (traceShowId ret2) == Return NullExpr = Er "Second block of IfCom has return"
                               | otherwise = addMessage "IfCom" condCheck
       where
         condCheck = typeCheckCondition cond db
+        ret1 = findRetinBloc$ fromBlock bloc1
+        ret2 = findRetinBloc$ fromBlock bloc2
 typeCheck _ _ = Ok
 
 ----------Tests which tests if the correct error arises-------------------
@@ -340,8 +348,12 @@ typeCheck_test_mincom2 = runChecksfromString "{ int x; x-= ya;}"
             == [Er "Type error in Min Command x"]
 typeCheck_test_while1 = runChecksfromString "{ while(ya >= 2){ int x;};}"
             == [Er "Not same type in Gq Condtion in While"]
-typeCheck_test_ifcomand = runChecksfromString "{ if(ya >= 2){ int x;}{};}"
+typeCheck_test_ifcomand1 = runChecksfromString "{ if(ya >= 2){ int x;}{};}"
             == [Er "Not same type in Gq Condtion in IfCom"]
+typeCheck_test_ifcomand2 = runChecksfromString "{ if(ya >= 2){ int x;}{ return 3;};}"
+            == [Er "Second block of IfCom has return"]
+typeCheck_test_ifcomand3 = runChecksfromString "{ if(ya >= 2){ return 3;}{ int x;};}"
+            == [Er "First block of IfCom has return"]
 typeCheck_test_ifexpr1 = runChecksfromString "{ int x = int ?(2==ya){2}{2} ;}"
             == [Er "Not same type in Eq Condtion in IfExpr in VarDecl x"]
 typeCheck_test_ifexpr2 = runChecksfromString "{ int x = int ? (ya >= ya) {ya}{2};}"
