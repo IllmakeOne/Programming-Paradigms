@@ -9,11 +9,79 @@ import Data.Maybe
 import Debug.Trace
 import Data.List
 
-generation :: Bloc -> [Instruction]
-generation xs = genBlock commands smTable ++ [EndProg]
+-- Get the main program block, and generate its commands
+-- tCount is the amount of threads.
+generation :: Bloc -> Int -> [Instruction]
+generation xs tCount = threadStuff ++ threadBusy
+  ++ genBlock commands tCount smTable offset ++
+            [Load (ImmValue 1) regA,
+            WriteInstr regA (DirAddr 0),
+            EndProg]
   where
     commands = fromBlock xs
     smTable = treeBuilder commands 1 []
+    threadBusy = [ComputeI Sprockell.Add regSprID 30 regB,
+                  WriteInstr reg0 (IndAddr regB),
+                  Jump (Abs 9)]
+    offset = length threadStuff + length threadBusy
+    threadStuff =
+      [Branch regSprID (Rel 6) -- target "beginLoop"
+      , TestAndSet (DirAddr 2)
+      , Receive regE
+      , Branch regE (Rel 2)
+      , Jump (Rel (-3))
+      , Jump (Abs offset) -- TODO!!! Jump (Rel beginOfTheMainCode)
+
+      , ReadInstr (DirAddr 0)
+      , Receive regB
+      , Compute Equal regB reg0 regE
+      , Branch regE (Rel 2)
+      , EndProg -- if the main thread is done
+      , TestAndSet (DirAddr 2) -- Get the read lock
+      , Receive regE
+      , Branch regE (Rel 2) -- if success let's continue
+      , Jump (Rel (-8)) -- else we need to try to get the lock again
+
+      , ComputeI Sprockell.Add regSprID 30 regB
+      , TestAndSet (IndAddr regB) -- Check if thread is busy
+      , Receive regE
+      , Branch regE (Rel 2) -- if it is busy
+      , Jump (Rel (-3)) -- else try again
+      , ReadInstr (DirAddr 3)
+      , Receive regB -- get the jump addr
+      , Push regB
+      , ComputeI Sprockell.Add regF 1 regC --
+      , ReadInstr (DirAddr 4)
+      , Receive regD
+      , Load (ImmValue 5) regA
+      , Compute Equal regD reg0 regE
+      , Branch regE (Rel 18)
+      , ReadInstr (IndAddr regA)
+      , Receive regB
+      , Store regB (IndAddr regC)
+      , Compute Sprockell.Incr regA regA regA
+      , Compute Sprockell.Incr regC regC regC
+      , ReadInstr (IndAddr regA)
+      , Receive regB
+      , Store regB (IndAddr regC)
+      , Compute Sprockell.Incr regA regA regA
+      , Compute Sprockell.Incr regC regC regC
+      , ReadInstr (IndAddr regA)
+      , Receive regB
+      , Store regB (IndAddr regC)
+      , Compute Sprockell.Incr regA regA regA
+      , Compute Sprockell.Incr regC regC regC
+      , Compute Sprockell.Decr regD regD regD
+      , Jump (Rel (-18))
+      , Load (ImmValue (length threadStuff)) regD
+      , Store regD (IndAddr regC)
+      , Compute Sprockell.Incr regC regC regC
+      , Store regF (IndAddr regC)
+      , Compute Sprockell.Add regC reg0 regF
+      , Pop regA
+      , WriteInstr reg0 (DirAddr 1)
+      , Jump (Ind regA) -- go the actual function
+      ]
 
 -- generationHelper :: [Commands] -> [DataBase] -> [Instruction]
 -- -- generationHelper [] _ =
@@ -24,45 +92,30 @@ generation xs = genBlock commands smTable ++ [EndProg]
 --  them earlier, before they are actually defined in the AST. The first thing
 --  will determine if we need to jump over the declared functions or not, and then
 --- generates the main body parts.
-genBlock :: [Commands] -> [DataBase] -> [Instruction]
-genBlock [] _ = []
--- Here span funcdecl commands
-genBlock commands smTable = jumpOverFuncs -- gen x smTable ++ genBlock xs smTable
-                            ++ generatedFunctions
-                            ++ genCommands body smTable ++ (traceShow fnTable) []
+genBlock :: [Commands] -> Int -> [DataBase] -> Int -> [Instruction]
+genBlock [] _ _ _ = []
+genBlock commands tCount smTable offset = jumpOverFuncs -- gen x smTable ++ genBlock xs smTable
+                            ++ generatedFunctions -- TODO NOT IN HERE!!!
+                            ++ genCommands body tCount smTable fnTable (offset + length jumpOverFuncs + length generatedFunctions) ++ (traceShow fnTable) []
   where
     (functions, body) = partition isFunction commands
-    (generatedFunctions, fnTable)  = genFuncs functions smTable (length jumpOverFuncs) []
+    (generatedFunctions, fnTable)  = genFuncs functions tCount smTable (offset + length jumpOverFuncs) []
     jumpOverFuncs = jumpOrNot (length generatedFunctions + length functions)
 
 
-genFuncs :: [Commands] -> [DataBase] -> Int -> [(String, Int)] -> ([Instruction] , [(String, Int)])
-genFuncs [] _ _ fnTable = ([], fnTable)
-genFuncs (x:xs) smTable offs fnTable = (instructions ++ otherInstructions, finalFnTable)
+genFuncs :: [Commands] -> Int -> [DataBase] -> Int -> [(String, Int)] -> ([Instruction] , [(String, Int)])
+genFuncs [] _ _ _ fnTable = ([], fnTable)
+genFuncs (x:xs) tCount smTable offs fnTable = (instructions ++ otherInstructions, finalFnTable)
   where
-    (instructions, newFnTable)    = genFunc x smTable offs fnTable
-    (otherInstructions, finalFnTable) = genFuncs xs smTable (offs + length instructions) newFnTable
+    (instructions, newFnTable)    = genFunc x tCount smTable offs fnTable
+    (otherInstructions, finalFnTable) = genFuncs xs tCount smTable (offs + length instructions) newFnTable
 
-genFunc :: Commands -> [DataBase] -> Int -> [(String, Int)] -> ([Instruction] , [(String, Int)])
-genFunc (FunDecl (Arg ftype fname) params body) smTable startOffs fnTable=
-  ([ Debug ("func: " ++ fname),
-    Load (ImmValue (1 + 3 * length params)) regA,
-    Compute Sub regF regA regA, -- 2. set the value of the ARP
-    Load (IndAddr reg0) regD, -- 3. amount of parameters already passed down
-
-    ComputeI Sprockell.Gt regD (length params ) regE, -- 4.  LOOP check if all parameters are passed
-    Branch regE (Rel 7), -- 5. then skip this parameter loading below
-
-    Load (IndAddr regA) regB, -- 6. Load the actual parameter value
-    Compute Sprockell.Add regF regD regE, -- 7. Store the address in the local data
-    Store regB (IndAddr regE), -- 8.
-    Compute Sprockell.Incr regD regD regD, -- 9.
-    ComputeI Sprockell.Add regA 3 regA, -- 10.
-
-    Jump (Rel (-7))] -- 11. go back to  LOOP
-    ++ genBlock (fromBlock body) smTable
-
-    ++ [Load (ImmValue (3 * length params)) regA,
+genFunc :: Commands -> Int -> [DataBase] -> Int -> [(String, Int)] -> ([Instruction] , [(String, Int)])
+genFunc (FunDecl (Arg ftype fname) params body) tCount smTable startOffs fnTable=
+    (before
+    ++ genBlock (fromBlock body) tCount smTable (startOffs + length before)
+    ++ [Load (IndAddr regF) regF,
+       Load (ImmValue (3 * length params)) regA,
        Compute Sub regF regA regA,
        ComputeI Sprockell.Add reg0 1 regD,
 
@@ -74,7 +127,7 @@ genFunc (FunDecl (Arg ftype fname) params body) smTable startOffs fnTable=
        Compute Sprockell.Lt regB reg0 regE, -- check if it is correct
        Branch regE (Rel 2),
        Store regC (IndAddr regB), -- then save in address
-       Compute Sprockell.Incr regA reg0 regA, -- move pointr to global
+       Compute Sprockell.Incr regA regA regA, -- move pointr to global
        Branch regE (Rel 10),
 
        Compute Sprockell.Add regB reg0 regE, -- lock address
@@ -85,7 +138,8 @@ genFunc (FunDecl (Arg ftype fname) params body) smTable startOffs fnTable=
        ComputeI Sprockell.Add regB 1 regB,
 
        WriteInstr regC (IndAddr regB),
-       ComputeI Sub regB 1 regB, --Unlock
+       ComputeI Sub regB 1 regB,
+       WriteInstr reg0 (IndAddr regB), -- Unlock again
        Compute Sprockell.Incr  regD regD regD, --add one to D
        ComputeI Sprockell.Add regA 2 regA,
        Jump (Rel (-23)), -- Go back to the LOOP
@@ -96,148 +150,268 @@ genFunc (FunDecl (Arg ftype fname) params body) smTable startOffs fnTable=
        Debug ("func: " ++ fname ++ " end! We're only going to jump!"),
        Jump (Ind regE) -- jump to da return address
        ], (fname, startOffs) : fnTable)
+       where
+         before = [Debug ("************func: " ++ fname),
+           Load (ImmValue (1 + 3 * length params)) regA,
+           Compute Sub regF regA regA, -- 2. set the value of the ARP
+           Load (ImmValue 1) regD, -- 3. amount of parameters already passed down
 
-genFunc command smTable _ fnTable = (gen command smTable, fnTable)
+           ComputeI Sprockell.Gt regD (length params ) regE, -- 4.  LOOP check if all parameters are passed
+           Branch regE (Rel 7), -- 5. then skip this parameter loading below
 
-updateSmTable :: [DataBase] -> String -> Int -> [DataBase]
-updateSmTable [] _ _ = []
-updateSmTable (DBF (Arg ftype dbfname) params initOffset : xs) fname offset |
-  dbfname == fname = (DBF (Arg ftype dbfname) params offset) : updateSmTable xs fname offset
-updateSmTable (other:xs) fname offset = other : updateSmTable xs fname offset
+           Load (IndAddr regA) regB, -- 6. Load the actual parameter value
+           Compute Sprockell.Add regF regD regE, -- 7. Store the address in the local data
+           Store regB (IndAddr regE), -- 8.
+           Compute Sprockell.Incr regD regD regD, -- 9.
+           ComputeI Sprockell.Add regA 3 regA, -- 10.
+
+           Jump (Rel (-7)),-- 11. go back to  LOOP
+
+           Compute Sprockell.Add regF reg0 regC,
+           ComputeI Sprockell.Add regC (length params + 1) regC,
+           Store regF (IndAddr regC),
+           Compute Sprockell.Add regC reg0 regF]
+
+
+
+genFunc command tCount smTable offs fnTable = (gen command tCount smTable fnTable offs, fnTable)
+
+-- updateSmTable :: [DataBase] -> String -> Int -> [DataBase]
+-- updateSmTable [] _ _ = []
+-- updateSmTable (DBF (Arg ftype dbfname) params initOffset : xs) fname offset |
+--   dbfname == fname = (DBF (Arg ftype dbfname) params offset) : updateSmTable xs fname offset
+-- updateSmTable (other:xs) fname offset = other : updateSmTable xs fname offset
 
 jumpOrNot :: Int -> [Instruction]
 jumpOrNot 0 = []
-jumpOrNot i = [Jump (Rel i)]
+jumpOrNot i = [Debug "Block Jump to main:", Jump (Rel i)]
 
 isFunction :: Commands -> Bool
 isFunction FunDecl{} = True
 isFunction _ = False
 
-genCommands :: [Commands] -> [DataBase] -> [Instruction]
-genCommands [] _ = []
-genCommands (x:xs) smTable = gen x smTable ++ genCommands xs smTable
+genCommands :: [Commands] -> Int -> [DataBase] -> [(String, Int)] -> Int -> [Instruction]
+genCommands [] _ _ _ _ = []
+genCommands (x:xs) tCount smTable fnTable offs = gen x tCount smTable fnTable offs ++ genCommands xs tCount smTable fnTable offs
 
 -- ALSO OPEN A NEW SCOPE!!!
 
 
-gen :: Commands -> [DataBase] -> [Instruction]
+gen :: Commands -> Int -> [DataBase] ->  [(String, Int)] -> Int -> [Instruction]
 -- Generate end
-gen End _ = []
-gen Structure.Nop _ = [Sprockell.Nop]
+gen End _ _ _ _ = []
+gen Structure.Nop _ _ _ _ = [Sprockell.Nop]
+-- Generate a global variable
+gen (GlobalVarDecl (Arg ftype name) expr) tCount smTable _ offset = genVar name expr Nothing tCount smTable
 -- Generate a variable
-gen (VarDecl (Arg varType name) expr) smTable = genVar name expr Nothing smTable -- genExpr expr smTable ++ -- pop that expression into regD
---                                    memAddr smTable name ++ -- eddress is in regE
---                                    [Pop regD, Store regD (IndAddr regE)]
-                                   -- [Load (IndAddr regE) regD, -- pop anythingg left in regD
-                                   -- Push regD] -- store val in regE in regD
-                                   -- Generate an (re-)assignment of a variable
+gen (VarDecl (Arg varType name) expr) tCount smTable _ offset = genVar name expr Nothing tCount smTable
 -- Generate a (re)assignment of a variable it's same as above
-gen (Ass varName expr) smTable = genVar varName expr Nothing smTable
-
+gen (Ass name expr) tCount smTable _ offset = genVar name expr Nothing tCount smTable
 -- Generate a print method
-gen (Print expr) smTable = genExpr expr smTable ++
-                           [Pop regE, WriteInstr regE numberIO]
-
+gen (Print expr) tCount smTable _ offset = genExpr expr tCount smTable ++
+                                    [Pop regE, WriteInstr regE numberIO]
 -- Generate if condition
-gen (IfCom cond thenBlock elseBlock) smTable
-  = genCond cond smTable
-  ++ [Pop regC,
-      ComputeI Xor regC 1 regC, -- Branch is implemented stupidly so we need to xor (negate) it
-      Branch regC (Rel (length genThen + 2)) -- plus two to also skip the branch over the else statement
-  ] ++ genThen ++ [Jump (Rel (length genElse + 1))] ++ genElse
+gen (IfCom cond thenBlock elseBlock) tCount smTable _ offs
+  = before ++ genThen ++ [Jump (Rel (length genElse + 1))] ++ genElse
   where
-    genThen = genBlock (fromBlock thenBlock) smTable
-    genElse = genBlock (fromBlock elseBlock) smTable
+    before = genCond cond tCount smTable ++
+      [Pop regC,
+      ComputeI Xor regC 1 regC, -- Branch is implemented stupidly so we need to xor (negate) it
+      Branch regC (Rel (length genThen + 2))] -- plus two to also skip the branch over the else statement
+    genThen = genBlock (fromBlock thenBlock) tCount smTable (offs + length before)
+    genElse = genBlock (fromBlock elseBlock) tCount smTable (offs + length before + length genThen + 1) -- Plus one for the jump stuff
 
 -- generate while statement and block
-gen (While cond block) smTable
-  = genWhileCond
-  ++ [Pop regC,
-      ComputeI Xor regC 1 regC, -- do this comparison again
-      Branch regC (Rel (lengthWhileBody + 2))] -- If nope, skip the entire while body
-  ++ genWhileBody ++ [Jump (Rel (-(length genWhileCond + lengthWhileBody + 3)))] -- then go back to the comparison
+gen (While cond block) tCount smTable _ offs
+  = before ++ genWhileBody ++ [Jump (Rel (-(length genWhileCond + lengthWhileBody + 3)))] -- then go back to the comparison
 
   where
-    genWhileCond = genCond cond smTable
-    genWhileBody = genBlock (fromBlock block) smTable
+    before = genWhileCond ++ [Pop regC,
+                              ComputeI Xor regC 1 regC, -- do this comparison again
+                              Branch regC (Rel (lengthWhileBody + 2))] -- If nope, skip the entire while body
+    genWhileCond = genCond cond tCount smTable
+    genWhileBody = genBlock (fromBlock block) tCount smTable (offs + length before)
     lengthWhileBody = length genWhileBody
 
 -- Generate code for decreasing a value
-gen (Structure.Decr varName) smTable = incrDecrVar varName Sprockell.Decr smTable
+gen (Structure.Decr varName) tCount smTable _ offset = incrDecrVar varName Sprockell.Decr tCount smTable
 -- Generate code for increasing a value
-gen (Structure.Incr varName) smTable = incrDecrVar varName Sprockell.Incr smTable
+gen (Structure.Incr varName) tCount smTable _ offset = incrDecrVar varName Sprockell.Incr tCount smTable
 -- Generate code for += statements
-gen (AddCom varName expr) smTable = genVar varName expr (Just Sprockell.Add) smTable
+gen (AddCom varName expr) tCount smTable _ offset = genVar varName expr (Just Sprockell.Add) tCount smTable
 -- Same as before, Generate code for -= statements
-gen (MinCom varName expr) smTable = genVar varName expr (Just Sprockell.Sub) smTable
+gen (MinCom varName expr) tCount smTable _ offset = genVar varName expr (Just Sprockell.Sub) tCount smTable
+gen (FunCall fname params) tCount smTable fnTable offset = code
+  where
+    code =
+          [Debug "joehoe funcall:"]
+          ++ concatMap (\x -> genExpr x tCount smTable) params
+          ++ [Compute  Sprockell.Add regF reg0 regC,
+              ComputeI Sprockell.Add regC (length params) regC] -- pointer to save to
+          ++ storeParameters params tCount smTable
+          ++ [Debug "***RETURN ADDRESS!!! HERE BELOW******* (Dus na de Jump abs hier ergens benee)",
+              Load (ImmValue (offset + length code)) regD, -- return address
+              Store regD (IndAddr regC),
+              Compute Sprockell.Incr regC regC regC,
+              Store regF (IndAddr regC), -- So store the return address in regF
+              Compute Sprockell.Add regC reg0 regF,  -- New scope of to the ARP
+              Jump (Abs (fnToOff fnTable fname))] -- Let's jump to the actual function
 
 -- Generate a new function
-gen (FunDecl (Arg ftype fname) params body) smTable = error "funDecl should not be defined in the gen method"
+gen (FunDecl (Arg ftype fname) params body) _ smTable _ _ = error "funDecl should not be defined in the gen method"
+
+storeParameters :: [Expr] -> Int -> [DataBase] -> [Instruction]
+storeParameters [] _ _ = []
+storeParameters (param:xs) tCount smTable = storeParam param tCount smTable
+                                            ++ storeParameters xs tCount smTable
+
+storeParam :: Expr -> Int -> [DataBase] -> [Instruction]
+-- TODO: Funct  pattern match TOO!
+storeParam (Identifier name) tCount smTable | x >= 0 =
+                                            before
+                                            ++ [Compute Sprockell.Add regF reg0 regE]
+                                            ++ replicate x (Load (IndAddr regE) regE)
+                                            ++ [ComputeI Sprockell.Add regE (y+1) regE,
+                                                Store regE (IndAddr regC)]
+                                            ++ after
+                                            | otherwise =
+                                                before
+                                                ++ [Load (ImmValue (-1)) regB,
+                                                Store regB (IndAddr regC)]
+                                                ++ after
+                              where
+                                before = [Pop regB,
+                                          Store regB (IndAddr regC),
+                                          Compute Sprockell.Incr regC regC regC]
+                                (x, y) = getOffset2 smTable name
+                                after = [Compute Sprockell.Incr regC regC regC,
+                                        Load (ImmValue globalMem) regB,
+                                        Store regB (IndAddr regC),
+                                        Compute Sprockell.Incr regC regC regC]
+                                globalMem | x >= 0 = -1
+                                          | otherwise = 30 + tCount + 2*y
+storeParam _ tCount smTable = [Pop regB,
+                              Store regB (IndAddr regC),
+                              Compute Sprockell.Incr regC regC regC,
+                              Load (ImmValue (-1)) regB,
+                              Store regB (IndAddr regC),
+                              Compute Sprockell.Incr regC regC regC,
+                              Load (ImmValue (-1)) regB,
+                              Store regB (IndAddr regC),
+                              Compute Sprockell.Incr regC regC regC]
+
+-- Small helper function to retrieve the offset of a function given its name and
+-- the functionTable.
+fnToOff :: [(String, Int)] -> String -> Int
+fnToOff [] st = error $ "Cannot find: " ++ st
+fnToOff ((st, i):xs) name | name == st = i
+                          | otherwise = fnToOff xs name
 
 -- Generate a value with an expression, and maybe an additional calculation
-genVar :: String -> Expr -> Maybe Operator -> [DataBase] -> [Instruction]
-genVar name expr op smTable = genExpr expr smTable  -- Pop that into regD
-                           ++ memAddr smTable name -- edress is in regE
-                           ++ [Pop regD]
-                           ++ genVarCompute op
-                           ++ [Store regD (IndAddr regE)]
+-- genVar :: String -> Expr -> Maybe Operator -> Int -> [DataBase] -> [Instruction]
+-- genVar name expr op tCount smTable = genExpr expr smTable  -- Pop that into regD
+--                            ++ storeGlobalOrLocal tCount op smTable name -- memAddr smTable name -- edress is in regE
+--                            -- ++ [Pop regD]
+--                            -- ++ genVarCompute op
+--                            -- ++ [Store regD (IndAddr regE)]
+
+genVar :: String -> Expr -> Maybe Operator -> Int -> [DataBase] -> [Instruction]
+genVar name expr op tCount smTable | x >= 0 =
+                                      loadVar
+                                      ++ [Store regD (IndAddr regE)]
+                                   | otherwise = loadVar
+                                                 ++ [WriteInstr regD (IndAddr regE),
+                                                 WriteInstr reg0 (IndAddr regA)] -- Unlock
+                            where
+                              (x, y) = getOffset2 smTable name
+                              loadVar = genExpr expr tCount smTable -- Store value in regD
+                                        ++ memAddr tCount smTable name (x, y) -- Store the eddress in regE
+                                        ++ [Pop regD]
+                                        ++ genVarCompute op (x, y)
+
 
 -- Do we want to compute something with the variable? This helper function will
 -- find out.
-genVarCompute :: Maybe Operator -> [Instruction]
-genVarCompute Nothing = []
-genVarCompute (Just op) = [Load (IndAddr regE) regA, -- load the value of the address in regA
-                           Compute op regA regD regD] -- Store the evaluation in regD
+genVarCompute :: Maybe Operator -> (Int, Int) -> [Instruction]
+genVarCompute Nothing _ = []
+genVarCompute (Just op) (x, y) | x >= 0 = [Load (IndAddr regE) regC, -- load the value of the address in regC
+                                          Compute op regC regD regD] -- Store the evaluation in regD
+                               | otherwise = [ReadInstr (IndAddr regE), -- Ask to get the actual value
+                                              Receive regC, -- Put that in regC
+                                              Compute op regC regD regD] -- Do also here the calculation
 
 -- Function to just get the value from memory and increase/ decrease based on
 -- the operator. The caller of this function has to make sure to only use Incr/ Decr.
-incrDecrVar :: String -> Operator -> [DataBase] -> [Instruction]
-incrDecrVar varName op smTable = memAddr smTable varName -- eddress is in regE
-                                 ++ [Load (IndAddr regE) regD -- store the actual value in regD
-                                    , Compute op regD regD regD
-                                    , Store regD (IndAddr regE)] -- store back in regE again
+incrDecrVar :: String -> Operator -> Int -> [DataBase] -> [Instruction]
+incrDecrVar name op tCount smTable | x >= 0 = loadVar ++ [Load (IndAddr regE) regD, -- store the actual value in regD
+                                               Compute op regD regD regD,
+                                               Store regD (IndAddr regE)] -- store back in regE again
+                                   | otherwise =  loadVar ++ [ReadInstr (IndAddr regE),
+                                                  Receive regD,
+                                                  Compute op regD regD regD,
+                                                  WriteInstr regD (IndAddr regE),
+                                                  WriteInstr reg0 (IndAddr regA)]
+                              where
+                                (x, y) = getOffset2 smTable name
+                                loadVar = memAddr tCount smTable name (x, y)
 
-genExpr :: Expr -> [DataBase] -> [Instruction]
+-- Generate an expression and push that to the stack
+genExpr :: Expr -> Int -> [DataBase] -> [Instruction]
 -- Generate constant
-genExpr (Constant i) smTable = [Load (ImmValue (fromInteger i)) regE, Push regE]
+genExpr (Constant i) _ smTable = [Load (ImmValue (fromInteger i)) regE, Push regE]
 -- Generate a boolean
-genExpr (BoolConst bool) smTable = [Load (ImmValue (boolToInt bool)) regE, Push regE]
+genExpr (BoolConst bool) _ smTable = [Load (ImmValue (boolToInt bool)) regE, Push regE]
 -- Generate the parens, just evaluate the expr in between it
-genExpr (Paren expr) smTable = genExpr expr smTable
+genExpr (Paren expr) tCount smTable = genExpr expr tCount smTable
 -- Generate a reference
-genExpr (Identifier name) smTable = memAddr smTable name
-                                    ++ [Load (IndAddr regE) regD, Push regD]
+genExpr (Identifier name) tCount smTable | x >= 0 = loadVar
+                                                    ++ [Load (IndAddr regE) regD,
+                                                        Push regD]
+                                         | otherwise = [Load (ImmValue globalAddress) regA, -- Get da lock
+                                                       TestAndSet (IndAddr regA),
+                                                       Receive regB,
+                                                       Branch regB (Rel 2),
+                                                       Jump (Rel (-4)),
+                                                       Load (ImmValue (globalAddress + 1)) regC, -- Individual Lock
+                                                       ReadInstr (IndAddr regC),
+                                                       Receive regD,
+                                                       Push regD,
+                                                       WriteInstr reg0 (IndAddr regA)] -- Unlock again
+                                    where
+                                      (x, y) = getOffset2 smTable name
+                                      loadVar = memAddr tCount smTable name (x, y)
+                                      globalAddress = 30 + tCount + 2*y
 -- Generate a calculation of two expressions
-genExpr (Structure.Mult exp1 exp2) smTable = genTwoExpr (Sprockell.Mul, exp1, exp2) smTable
-genExpr (Structure.Add exp1 exp2) smTable  = genTwoExpr (Sprockell.Add, exp1, exp2) smTable
-genExpr (Structure.Min exp1 exp2) smTable  = genTwoExpr (Sprockell.Sub, exp1, exp2) smTable
+genExpr (Structure.Mult exp1 exp2) tCount smTable = genTwoExpr (Sprockell.Mul, exp1, exp2) tCount smTable
+genExpr (Structure.Add exp1 exp2) tCount smTable  = genTwoExpr (Sprockell.Add, exp1, exp2) tCount smTable
+genExpr (Structure.Min exp1 exp2) tCount smTable  = genTwoExpr (Sprockell.Sub, exp1, exp2) tCount smTable
 
 -- Generate an inline if statement
 -- It's the same as if statement above but now with expressions instead of blocks.
-genExpr (IfExpr _ cond exp1 exp2) smTable =
-  genCond cond smTable
+genExpr (IfExpr _ cond exp1 exp2) tCount smTable =
+  genCond cond tCount smTable
   ++ [Pop regC,
       ComputeI Xor regC 1 regC, -- Branch is implemented stupidly so we need to xor (negate) it
       Branch regC (Rel (length genExp1 + 2)) -- plus two to also skip the branch over the else statement
   ] ++ genExp1 ++ [Jump (Rel (length genExp2 + 1))] ++ genExp2
   where
-    genExp1 = genExpr exp1 smTable
-    genExp2 = genExpr exp2 smTable
+    genExp1 = genExpr exp1 tCount smTable
+    genExp2 = genExpr exp2 tCount smTable
 -- Else error out
-genExpr _ smTable = error "genExpr error"
+genExpr _ _ smTable = error "genExpr error"
 
 
 -- Generate the code for doing a condition with two expressions
-genCond :: Condition -> [DataBase] -> [Instruction]
-genCond (Structure.Lt exp1 exp2) smTable = genTwoExpr (Sprockell.Lt,    exp1, exp2) smTable
-genCond (Structure.Eq exp1 exp2) smTable = genTwoExpr (Sprockell.Equal, exp1, exp2) smTable
-genCond (Structure.Gt exp1 exp2) smTable = genTwoExpr (Sprockell.Gt,    exp1, exp2) smTable
-genCond (Structure.Lq exp1 exp2) smTable = genTwoExpr (Sprockell.LtE,   exp1, exp2) smTable
-genCond (Structure.Gq exp1 exp2) smTable = genTwoExpr (Sprockell.GtE,   exp1, exp2) smTable
+genCond :: Condition -> Int -> [DataBase] -> [Instruction]
+genCond (Structure.Lt exp1 exp2) tCount smTable = genTwoExpr (Sprockell.Lt,    exp1, exp2) tCount smTable
+genCond (Structure.Eq exp1 exp2) tCount smTable = genTwoExpr (Sprockell.Equal, exp1, exp2) tCount smTable
+genCond (Structure.Gt exp1 exp2) tCount smTable = genTwoExpr (Sprockell.Gt,    exp1, exp2) tCount smTable
+genCond (Structure.Lq exp1 exp2) tCount smTable = genTwoExpr (Sprockell.LtE,   exp1, exp2) tCount smTable
+genCond (Structure.Gq exp1 exp2) tCount smTable = genTwoExpr (Sprockell.GtE,   exp1, exp2) tCount smTable
 
 -- Generate a calculation of two expressions. Evaluates both expressions and pushes back the result to the stack.
-genTwoExpr :: (Operator, Expr, Expr) -> [DataBase] -> [Instruction]
-genTwoExpr (op, exp1, exp2) smTable = genExpr exp1 smTable ++ genExpr exp2 smTable
+genTwoExpr :: (Operator, Expr, Expr) -> Int ->  [DataBase] -> [Instruction]
+genTwoExpr (op, exp1, exp2) tCount smTable = genExpr exp1 tCount smTable ++ genExpr exp2 tCount smTable
                                       ++ [Pop regB, Pop regA,
                                          Compute op regA regB regA,
                                          Push regA]
@@ -248,26 +422,42 @@ boolToInt True  = 1
 boolToInt False = 0
 
 
--- Get the memory address
-memAddr :: [DataBase] -> String -> [Instruction]
-memAddr smTable varName = [Compute Sprockell.Add regF reg0 regE]
-                  ++ replicate x (Load (IndAddr regE) regE)
-                  ++ [ComputeI Sprockell.Add regE y regE]
-                  where
-                    (x', y') = getOffset smTable varName
-                    x = x' - 1
-                    y = y' + 1
+-- -- Get the memory address for local or global variables
+memAddr :: Int -> [DataBase] -> String -> (Int, Int) -> [Instruction]
+memAddr  tCount smTable name (x, y) | x >= 0 = [Compute Sprockell.Add regF reg0 regE] -- Local
+                                   ++ replicate x (Load (IndAddr regE) regE) -- So get the address in regE
+                                   ++ [ComputeI Sprockell.Add regE y regE]
+                        | otherwise = [Load (ImmValue globalAddress) regA, -- mr world wide.
+                                      TestAndSet (IndAddr regA), -- get the Lock
+                                      Receive regB,
+                                      Branch regB (Rel 2),
+                                      Jump (Rel (-3)), -- try again
+                                      -- Store the address location in regC
+                                      Load (ImmValue (globalAddress + 1)) regE] -- Now we have the lock get the actual value of the address
+
+                        where
+                          globalAddress = 30 + tCount + (2*y) -- TODO
+
+getOffset2 :: [DataBase] -> String -> (Int, Int)
+getOffset2 smTable name = (x, y)
+  where
+    (x', y) = getOffset smTable name
+    x = x' - 1
+    --y = y' + 1 -- TODO MAYBE CHANGE BACK AGAIN?
 
 --------- DEBUG REMOVE WHEN DONE!!
 codeGenTest = do
-  result <- parseFromFile parseBlock "../examples/functest.amv"
+  result <- parseFromFile parseBlock "../examples/functest2.amv"
   case result of
     Left err -> print err
     Right xs -> do
+      --print $ treeBuilder (fromBlock xs) 1 []
       putStrLn (pretty code) -- print code
-      --run [code]
+      run [code]
+      --runWithDebugger (debuggerSimplePrintAndWait myShow) [code]
       where
-        code = generation xs
+        code = generation xs threadAmount
+        threadAmount = 1
 
 pretty :: [Instruction] -> String
 pretty = pretty' 0
@@ -279,6 +469,40 @@ pretty' i (x:xs) = show i ++ ":    " ++ show x ++ "\n" ++ pretty' (i+1) xs
 showLocalMem :: DbgInput -> String
 showLocalMem ( _ , systemState ) = show $ localMem $ head $ sprStates systemState
 
+
+test = [Load (ImmValue 1000) 6
+  ,Push 6
+  ,Pop 6
+  ,Load (ImmValue 31) 2
+  ,TestAndSet (IndAddr 2)
+  ,Receive 3
+  ,Branch 3 (Rel 2)
+  ,Jump (Rel (-3))
+  ,Load (ImmValue 32) 4
+  ,WriteInstr 6 (IndAddr 4)
+  ,WriteInstr 0 (IndAddr 2)
+  ,Load (ImmValue 31) 2
+  ,TestAndSet (IndAddr 2)
+  ,Receive 3
+  ,Branch 3 (Rel 2)
+  ,Jump (Rel (-4))
+  ,Load (ImmValue 32) 4
+  ,ReadInstr (IndAddr 4)
+  ,Receive 5
+  ,Push 5
+  ,WriteInstr 0 (IndAddr 2)
+  ,Pop 6
+  ,WriteInstr 6 (DirAddr 65536)
+  ,Load (ImmValue 1) 2
+  ,WriteInstr 2 (DirAddr 0)
+  ,EndProg
+  ]
+-- test = [Load (ImmValue 0) regA, -- 0
+--         Jump (Abs 3), --1
+--         Load (ImmValue 1) regA, -- 2
+--         Load (ImmValue 2) regA, -- 3
+--         WriteInstr regA numberIO, --4
+--         EndProg]
 -- koekje = [Load (ImmValue 1000) 6,
 -- Push 6,Compute Add 7 0 6,ComputeI Add 6 1 6,Pop 5,Store 5 (IndAddr 6),
 -- Debug "FuncCall",

@@ -12,4 +12,6 @@ func void koekjes(& int jesse) {
     jesse += 3;
     print jesse;
 };
+
+add(jesse);
 }

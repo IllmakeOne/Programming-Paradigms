@@ -1,0 +1,10 @@
+{
+global int jesse = 1000;
+
+func void add(& int jesse) {
+    jesse = 123;
+};
+add(666);
+print jesse;
+
+}

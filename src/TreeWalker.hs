@@ -144,8 +144,8 @@ onlyGlobals ((DB arg 0 off):db) =(DB arg 0 off) : onlyGlobals db
 onlyGlobals (x:db) = onlyGlobals db
 -- onlyGlobals_test1 =
 
---helped method that return the scope and offset of a varaibles based on its name
--- not used anywhere at the moment of writing this comment
+--helper method that return the scope and offset of a varaibles based on its name
+-- needed in the Generator
 getOffset :: [DataBase] -> String -> (Int, Int)
 getOffset [] _ = error "getOffset error"
 getOffset (DB (Arg argType argName) x y:xs) name
@@ -258,14 +258,6 @@ typeExpr (Min e1 e2 ) db | not (t1 == t2) = Er "Substractions elemets are not th
         where
           t1 = typeExpr e1 db
           t2 = typeExpr e2 db
-<<<<<<< HEAD
-typeExpr (IfExpr typ cond _ _ ) db | typeCheckCondition cond db = typ
-                                   | otherwise = error "Condition types not the same in IfExpr"
-typeExpr (Identifier x ) db = findinDb x db
-typeExpr fun@(Funct name exprs) db | checkCorrectFuncExpr db fun = findinDb name db
-                                   | otherwise = error "Function's arguments are not correct in FuncExpr"
-typeExpr _ _ = SimplyNull
-=======
 typeExpr (IfExpr typ cond _ _ ) db | boolTypeError$ typeCheckCondition cond db =Crt  typ
                                    | otherwise = Er "Condition types not the same in IfExpr"
 typeExpr (Identifier x ) db = Crt$ findinDb x db
@@ -274,7 +266,6 @@ typeExpr fun@(Funct name exprs) db | checkCorrectFuncExpr db fun = Crt$ findinDb
 
 typeExpr _ _ =Crt  SimplyNull
 
->>>>>>> 96292ccf167a78c7d366a6dbe00236b8f001720d
 
 --this methods looks in the database for a namse and returns its type
 -- used in determining a exprssion's type -> typeExpr
