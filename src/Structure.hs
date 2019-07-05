@@ -7,7 +7,7 @@ data Bloc = Block [Commands]
 
 
 data Commands = VarDecl ArgType Expr          -- DONE IMPLEMENTED IN GENERATOR
-              | GlobalVarDecl ArgType Expr
+              | GlobalVarDecl ArgType Expr -- DONE
               | FunDecl ArgType [Param] Bloc -- DONE
               | FunCall String [Expr] -- DONE
               | Fork Bloc
@@ -23,7 +23,7 @@ data Commands = VarDecl ArgType Expr          -- DONE IMPLEMENTED IN GENERATOR
               | Comment String      --TODO use endby
               | Nop                 -- DONE IMPLEMENTED IN GENERATOR
               | End                 -- DONE IMPLEMENTED IN GENERATOR
-              | Return Expr
+              | Return Expr -- DONE
             deriving (Eq,Show)
 
 data Param = ByVal ArgType | ByRef ArgType
