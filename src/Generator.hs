@@ -266,7 +266,7 @@ gen (FunCall fname params) tCount smTable fnTable offset = (offset + length code
   where
     code =
           [Debug "joehoe funcall:"]
-          ++ concatMap (\x -> genExpr x tCount smTable) params
+          ++ concat(reverse (map (\x -> genExpr x tCount smTable) params))
           ++ [Compute  Sprockell.Add regF reg0 regC,
               ComputeI Sprockell.Add regC (length params) regC] -- pointer to save to
           ++ storeParameters params tCount smTable

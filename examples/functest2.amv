@@ -1,12 +1,15 @@
 {
 global int jesse = 1000;
 global int robert = 3000;
-func void add(int koekjes) {
+func void add(& int koekjes, int toAdd) {
+    print(koekjes);
+    print(toAdd);
     //jesse += koekjes;
-    koekjes = robert;
+    koekjes = robert + toAdd;
+
 };
 //int baas = 123;
-add(jesse);
+add(jesse, 123);
 print jesse;
 
 }

@@ -1,0 +1,9 @@
+{
+global int jesse = 1000;
+func int add(int amount) {
+    amount += 1;
+    return amount;
+};
+jesse = add(3);
+print jesse;
+}
