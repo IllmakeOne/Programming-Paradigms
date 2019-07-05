@@ -17,53 +17,43 @@ pt = [
       ------------------------------------------------------------------------
     ParseT {
         testName = "parseCondition_test1",
-        testParse = parse parseCondition "" "2 == fib(2)" ==
-              (Right (Eq (Constant 2) (Funct "fib" [Constant 2])))
+        testParse = parseCondition_test1
         },
     ParseT {
         testName = "parseCondition_test3",
-        testParse = parse parseCondition "" " 2 >= fib(2)" ==
-              (Right (Gq (Constant 2) (Funct "fib" [Constant 2])))
+        testParse = parseCondition_test3
         },
     ParseT {
         testName = "parseTerm_test2",
-        testParse =  parse parseExpr "" "2*4*4" ==
-              (Right (Mult (Constant 2) (Mult (Constant 4) (Constant 4))))
+        testParse =  parseTerm_test2
         },
     ParseT {
         testName = "arguments_test1",
-        testParse =  parse arguments "" "2,x,5" ==
-              (Right [Constant 2,Identifier "x",Constant 5])
+        testParse =  arguments_test1
         },
     ParseT {
         testName = "parseExpr_testnu",
-        testParse =  parse parseExpr "" "nu" ==
-              (Right (BoolConst False))
+        testParse =  parseExpr_testnu
         },
     ParseT {
         testName = "parseExpr_test1",
-        testParse =  parse parseExpr "" "3+3*2" ==
-              (Right (Add (Constant 3) (Mult (Constant 3) (Constant 2))))
+        testParse =  parseExpr_test1
         },
     ParseT {
         testName = "parseIfexpr_tesst1",
-        testParse =  parse parseExpr "" "int ?(2==2){2+1}{2}" ==
-              (Right (IfExpr SimplyInt (Eq (Constant 2) (Constant 2)) (Add (Constant 2) (Constant 1)) (Constant 2)))
+        testParse =  parseIfexpr_tesst1
         },
     ParseT {
-        testName = "parseIfexpr_tesst1",
-        testParse =  parse parseExpr "" "bool ?(2==2){nu}{ya}" ==
-              (Right (IfExpr SimplyBol (Eq (Constant 2) (Constant 2)) (BoolConst False) (BoolConst True)))
+        testName = "parseIfexpr_tesst2",
+        testParse =  parseIfexpr_tesst2
         },
     ParseT {
         testName = "parsefactor_testFunct",
-        testParse =  parse parseExpr "" "fib(2,3,ya)" ==
-              (Right (Funct "fib" [Constant 2,Constant 3,BoolConst True]))
+        testParse =  parsefactor_testFunct
         },
     ParseT {
         testName = "parsefactor_testIfexpr",
-        testParse =  parse parseExpr "" "int ?(2<x){2+x}{2+3}" ==
-              (Right (IfExpr SimplyInt (Lt (Constant 2) (Identifier "x")) (Add (Constant 2) (Identifier "x")) (Add (Constant 2) (Constant 3))))
+        testParse =  parsefactor_testIfexpr
         },
 
 
@@ -72,12 +62,11 @@ pt = [
     ------------------------------------------------------------------------
     ParseT {
         testName = "parseCommand_testJoin",
-        testParse =  parse parseCommand "" "join ;" == Right Join
+        testParse =  parseCommand_testJoin
         },
     ParseT {
         testName = "parsefactor_testIfexpr",
-        testParse =  parse parseCommand "" "return int ?(x<2) {2}{3};" ==
-              (Right (Return (IfExpr SimplyInt (Lt (Identifier "x") (Constant 2)) (Constant 2) (Constant 3))))
+        testParse =  parsefactor_testIfexpr
         },
     ParseT {
         testName = "parseBlock_test1",
@@ -85,23 +74,19 @@ pt = [
         },
     ParseT {
         testName = "parseIfCom_tesst2",
-        testParse = parse parseCommand "" "if (from >= amount) { from -= amount; to += amount;} {};" ==
-              (Right (IfCom (Gq (Identifier "from") (Identifier "amount")) (Block [MinCom "from" (Identifier "amount"),AddCom "to" (Identifier "amount"),End]) (Block [End])))
+        testParse = parseIfCom_tesst2
         },
     ParseT {
         testName = "parseFunDecl_test2",
-        testParse = parse parseCommand "" "func void theStuff(int a, bool b){ int x = a;}" ==
-              (Right (FunDecl (Arg SimplyNull "theStuff") [ByVal (Arg SimplyInt "a"),ByVal (Arg SimplyBol "b")] (Block [VarDecl (Arg SimplyInt "x") (Identifier "a"),End])))
+        testParse = parseFunDecl_test2
         },
     ParseT {
         testName = "parseIncr_test1",
-        testParse = parse parseCommand "" "x ++;" ==
-              (Right (Incr "x"))
+        testParse = parseIncr_test1
         },
     ParseT {
         testName = "params_test1",
-        testParse = parse params "" "& bool h, \n int x, \n bool x" ==
-              (Right [ByRef (Arg SimplyBol "h"),ByVal (Arg SimplyInt "x"),ByVal (Arg SimplyBol "x")])
+        testParse = params_test1
         },
 
 
@@ -111,19 +96,19 @@ pt = [
 
     ParseT {
         testName = "scopesTracker_test1",
-        testParse = scopesTracker [(1,0),(2,4)] 2 == 4
+        testParse = scopesTracker_test1
         },
     ParseT {
         testName = "scopesTracker_test2",
-        testParse = scopesTracker [(1,0),(2,4)] 1 == 0
+        testParse = scopesTracker_test2
+        },
+    ParseT {
+        testName = "increaseOffset_test1",
+        testParse = increaseOffset_test1
         },
     ParseT {
         testName = "increaseOffset_test2",
-        testParse = increaseOffset [] 2 == [(2,0)]
-        },
-    ParseT {
-        testName = "increaseOffset_test2",
-        testParse = increaseOffset [(1,0),(2,4)] 2 == [(1,0),(2,5)]
+        testParse = increaseOffset_test2
         },
 
     ------------------------------------------------------------------------

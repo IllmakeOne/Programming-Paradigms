@@ -27,16 +27,13 @@ data DataBase = DB ArgType Int Int | DBF ArgType [Param] Bloc | Err ArgType Type
 -- the bool is true if there are no errors found in the typechecking and the symbol table creation
 -- if it is falls, the erros that were found are stores
 checkCorrectProgram :: String -> (Bool,[DataBase])
-checkCorrectProgram stg | not$ (traceShowId$ showErrorinDB dbp) == [] = (False, showErrorinDB dbp)
+checkCorrectProgram stg | not$ showErrorinDB dbp == [] = (False, showErrorinDB dbp)
                         | otherwise = (True, [])
     where
       db = symbolTableBuilder_fromStg stg
       tcheck = typeCheckProgram (fromStCL stg) db
       dbp = addTypeErrstoDB tcheck db
 
-
-checkCorrectProgram_test1 = checkCorrectProgram "{ func int fib (int x) { print x;}; fib(2); }"
-      ==(False,[Err (Arg SimplyNull "") (Er "Could not find Method in DB in Funcall fib"),Err (Arg SimplyInt "fib") (Er "Method has no return ")])
 
 
 checkCorrectProgram_report = checkCorrectProgram "{ int x =2; bool x = ya ; func int fib (int x) { print x;}; func int other (int x) { return ya;}; fib (2);}"
@@ -76,18 +73,21 @@ symbolTableBuilder ((GlobalVarDecl arg expr):xs) scope off |boolTypeError dupTes
       add = (DB arg 0 (scopesTracker (increaseOffset off 0) 0))
         -- (DB arg 0 (scopesTracker off scope)): symbolTableBuilder xs scope (increaseOffset off scope)
 
-symbolTableBuilder ((FunDecl arg param bloc):xs) scope off | boolTypeError dupTest && typeArgtype arg == getType ret = add:ownscope ++ db
-                                                   | boolTypeError ret == False = Err arg ret  :db
-                                                   | typeArgtype arg == getType ret =(Err arg (Er ("Dupicant Method"))) : db
-                                                   | boolTypeError dupTest && getType ret == SimplyNull= (Err arg (Er "Method has no return ")) : db
-                                                   | otherwise = Err arg (Er  "Return type of methods not same type and methods type "):db
+symbolTableBuilder ((FunDecl arg param bloc):xs) scope off
+                              | boolTypeError dupTest == False =(Err arg dupTest) : db
+                              | boolTypeError ret == False = Err arg ret  :db
+                              | typeArgtype arg == getType ret = add:ownscope ++ db
+                              | not(typeArgtype arg == SimplyNull) && getType ret == SimplyNull
+                                          -- = Err arg (Er  "Return type of methods not same type and methods type "):db
+                                          = (Err arg (Er "Method has no return, and it should ")) : db
+                              | otherwise = Err arg (Er  "Return type of methods not same type and methods type "):db
     where
       dupTest= checkDuplicant db arg scope
       db = symbolTableBuilder xs scope off
       ownscope = symbolTableBuilder (((paramtoCom param )++ fromBlock bloc)) (scope+1) (increaseOffset off (scope+1))
       add = (DBF arg param bloc)
       blocReturn = (findRetinBloc $ fromBlock bloc) --the return command of the method
-      ret | typeArgtype arg == SimplyNull && blocReturn == (Return NullExpr) = Crt SimplyNull
+      ret | blocReturn == (Return NullExpr) = Crt SimplyNull
           | typeArgtype arg == SimplyNull && not (blocReturn == (Return NullExpr)) = Er "Void method with return"
           | otherwise = Crt$ exprTypeFromRet (onlyGlobals db) param bloc blocReturn
       --ret is the return type of the methods being declared
@@ -98,6 +98,13 @@ symbolTableBuilder ((Fork bloc):xs) scope off =
 symbolTableBuilder (x:xs) scope off = symbolTableBuilder xs scope off
 
 
+fundecl_err1 = checkCorrectProgram "{ func bool fib (& int x) { return 2;};fib(x); }"
+            == (False,[Err (Arg SimplyNull "") (Er "No params because didnt find method "),Err (Arg SimplyBol "fib") (Er "Return type of methods not same type and methods type ")])
+fundecl_err2 = checkCorrectProgram "{ func bool fib (& int x) { };fib(x); }"
+            == (False,[Err (Arg SimplyNull "") (Er "No params because didnt find method "),Err (Arg SimplyBol "fib") (Er "Method has no return, and it should ")])
+fundecl_err3 = checkCorrectProgram "{ func bool fib (& int x) { return ya;};fib(x); }"
+            == (False,[Err (Arg SimplyNull "") (Er "Non void methods called ")])
+
 -- auxiliary method used in -> symbolTableBuilder FuncDecl case
 --  it creates variable declaration commnad out fo the parameters
 --so they can be easily introduced in the scope of the methods
@@ -106,13 +113,16 @@ paramtoCom [] = []
 paramtoCom ((ByVal arg):xs) = VarDecl arg NullExpr : paramtoCom xs
 paramtoCom ((ByRef arg):xs) = VarDecl arg NullExpr : paramtoCom xs
 
---checks if by referece parameters are not simplke values
+
+--checks if by referece parameters are not simple values
 checkRefParam :: [Param] -> [Expr]-> TypeError
-checkRefParam [] []= Ok
-checkRefParam ((ByRef (Arg typ name)):ps) ((Constant i):ex) = checkRefParam ps ex
-checkRefParam ((ByRef (Arg typ name)):ps) (_:ex) = Er "Param by referece is given an expression"
-checkRefParam (p:ps) (e:es) = checkRefParam ps es
--- checkRefParam_test = []
+checkRefParam [] [] = Ok
+checkRefParam ((ByRef (Arg typ name)):ps) ((Identifier _):ex) = checkRefParam ps ex
+checkRefParam ((ByRef _):ps) (_:ex) = Er "Param by referece is given an expression"
+checkRefParam ((ByVal _):ps) (_:ex) = checkRefParam ps ex
+checkRefParam _ [] = Er "Fewer arguments than parameters"
+checkRefParam [] _ = Er "Fewer parameters than arguments"
+-- checkRefParam_test = checkRefParam [ByRef (Arg SimplyInt "x"),ByVal (Arg SimplyInt "y"),ByVal (Arg SimplyInt "z")]
 
 --this methods takes a string , parses it and then creates the symbol table for it, withtout the type errros
 symbolTableBuilder_fromStg :: String -> [DataBase]
@@ -123,23 +133,30 @@ symbolTableBuilder_fromStg string | isLeft parsed = error "Not parsed correctly 
 
 symbolTableBuilder_test1 = symbolTableBuilder_fromStg
       "{ global int z = 3 ;func int fib(bool x, & int y){ x =ya ;return y;}; int x = fib (ya, 2);func int fibi(int a, & int b){ a =2 ;return b;};}"
+      == [DB (Arg SimplyInt "z") 0 0,DBF (Arg SimplyInt "fib") [ByVal (Arg SimplyBol "x"),ByRef (Arg SimplyInt "y")] (Block [Ass "x" (BoolConst True),Return (Identifier "y"),End]),DB (Arg SimplyBol "x") 2 1,DB (Arg SimplyInt "y") 2 2,DB (Arg SimplyInt "x") 1 0,DBF (Arg SimplyInt "fibi") [ByVal (Arg SimplyInt "a"),ByRef (Arg SimplyInt "b")] (Block [Ass "a" (Constant 2),Return (Identifier "b"),End]),DB (Arg SimplyInt "a") 2 1,DB (Arg SimplyInt "b") 2 2]
 symbolTableBuilder_test2 = symbolTableBuilder_fromStg
       "{ global int a = 0 ;global bool b = ya; int c = 1; bool d; global bool e;func void aux(){ int b = 0;}; }"
-symbolTableBuilder_test3 = showErrorinDB$ symbolTableBuilder_fromStg
-      "{ func int fib (int x) { print x;}; fib(2); }"
-delete2 = parse parseBlock "" "{ int x; func int fib(& int x, int y){ print y; }; }"
+-- symbolTableBuilder_test3 =( showErrorinDB symbolTableBuilder_fromStg
+--       "{ func int fib (int x) { print x;}; fib(2); }")
+--       == [Err (Arg SimplyInt "fib") (Er "Method has no return, and it should ")]
+delete2 = parse parseBlock "" "{ global int jesse = 1000;func int add(int amount) { amount += 1; return amount;};jesse = add(3);print jesse;}"
 
 --this method was used to test if the parameters are correclty added to the function's scopes
 symbolTableBuilder_test4 = symbolTableBuilder_fromStg
-                  "{ int x; func void fib(& int x, int y, int z){ return y; };int z =2; }"
+                  "{ int x; func int fib(& int x, int y, int z){ return y; };int z =2; }"
+-- this method was used to test if it correctly rejects FunCall wiht values instead of indetifies for pram by ref
+symbolTableBuilder_test5 = symbolTableBuilder_fromStg
+      "{ func void fib(& int x, int y, int z){ return y; }; }"
+        == [Err (Arg SimplyNull "fib") (Er "Void method with return")]
+
 
 --this methods is used to get the current offset of a given scope 'x'
 scopesTracker :: [(Int,Int)] ->Int ->Int
 scopesTracker [] _ = error "Could not find offeset of scope"
 scopesTracker ((a,b):xs) x | a == x = b
                            | otherwise = scopesTracker xs x
-scopesTracker_test1 = scopesTracker [(1,0),(2,4)] 2
-scopesTracker_test2 = scopesTracker [(1,0),(2,4)] 1
+scopesTracker_test1 = scopesTracker [(1,0),(2,4)] 2 == 4
+scopesTracker_test2 = scopesTracker [(1,0),(2,4)] 1 == 0
 
 --this methods is used to increment the offest of a scope 'x'
 --if the scope is not declared yet, declare it with offset 0
@@ -147,8 +164,8 @@ increaseOffset:: [(Int, Int)] -> Int -> [(Int, Int)]
 increaseOffset [] x = [(x,0)]
 increaseOffset ((a,b):xs) x | a == x = (a,(b+1)):xs
                             | otherwise = (a,b):increaseOffset xs x
-increaseOffset_test1 = increaseOffset [(1,0),(2,4)] 2
-increaseOffset_test2 = increaseOffset [] 2
+increaseOffset_test1 = increaseOffset [(1,0),(2,4)] 2 == [(1,0),(2,5)]
+increaseOffset_test2 = increaseOffset [] 2  == [(2,0)]
 
 --this methods seraches for the return in a list of commands
 -- used in -> symbolTableBuilder for fundecl for checking if a method has the corret  return type
@@ -167,6 +184,7 @@ addByrefParamsDb ((ByRef arg):ps) scope off =
       (DB arg (scopesTracker (increaseOffset off scope) scope) scope):addByrefParamsDb ps scope (increaseOffset off (scope+1))
 addByrefParamsDb_tes1 = addByrefParamsDb [ByVal (Arg SimplyInt "x"),ByRef (Arg SimplyInt "y")] 1 [(0,0)]
 
+
 --method that puts together the current database and the DB entries of a blok of a methods, and the methods;s parameters
 --methods used in ->  symbolTableBuilder for fundecl for checking if a method has the corret  return type
 --this is done because in some cases the return is one fo the parameters
@@ -177,6 +195,7 @@ exprTypeFromRet globalDb param bloc (Return expr) =
      paramdb = addByrefParamsDb param 0 []
      blocdb = symbolTableBuilder (fromBlock bloc) 0 []
      db = paramdb ++ blocdb ++ globalDb
+
 
 --methods taht filters out all the non global variables
 -- used in -> symbolTableBuilder for fundecl for checking if a method has the corret  return type
@@ -212,7 +231,7 @@ checkDuplicant (( DB dbarg sco _):xs) arg scope
       | 0 == sco && stringArtgType dbarg == stringArtgType arg = Er "Var with same name as global variable"
       | otherwise = checkDuplicant xs arg scope
 checkDuplicant ((DBF name params _):xs) arg scope
-      | stringArtgType name == stringArtgType arg = Er "Duplicate declaration for global variable"
+      | stringArtgType name == stringArtgType arg = Er "Duplicate declaration of method"
       | otherwise = checkDuplicant xs arg scope
 checkDuplicant ((Err _ _):xs) arg scope = checkDuplicant xs arg scope
 
@@ -241,6 +260,8 @@ typeCheckProgram_test1 = runChecksfromString "{ int x = 0; bool x = ya; bool z =
 typeCheckProgram_test2 = runChecksfromString "{ int x = 0; int y = 2; int z = ya; print x;}"
 typeCheckProgram_test3 = runChecksfromString "{ while(ya >= 2){ int x;};}"
 
+
+
 --this metiods check is an individial command has the correct type
 -- returns true if the types are correct and throws an error for different reasons
 -- used in -> typeCheckProgram
@@ -256,12 +277,16 @@ typeCheck db (GlobalVarDecl typ ex) | typeArgtype typ == (getType$ typeExpr ex d
                               | otherwise = Er  ("GlobalVarDecl " ++ stringArtgType typ ++ " wrong type assigned")
 
 typeCheck db fun@(FunCall name exprs)
-                              | boolTypeError exprt =
-                                    Er ("Funcall "++name ++ " is not Void type")
-                              | findinDb name db ==Crt SimplyNull && boolTypeError exprt= Ok
-                              | otherwise =  addMessage ("Funcall "++name) exprt
+                              | boolTypeError nomer == False = nomer
+                              | not$ boolTypeError exprt = exprt
+                              | (traceShowId $findinDb name db) == Crt SimplyNull = Ok
+                              | otherwise =  Er "Non void methods called "
       where
         exprt = checkCorrectFuncCommand db fun
+        param = findMethodParamsDB db name
+        nomer | fst param = checkRefParam (snd param) exprs
+              | otherwise = Er "No params because didnt find method "
+
 typeCheck db (Ass name ex) | findinDb name db == res = Ok
                            | boolTypeError res = Er ("Wrong type in Assigmnet "++name)
                            | otherwise = addMessage ("Assigment "++ name) res
@@ -289,10 +314,14 @@ typeCheck db (While cond _) | boolTypeError$ condCheck = Ok
                             | otherwise = addMessage "While" condCheck
       where
         condCheck = typeCheckCondition cond db
-typeCheck db (IfCom cond _ _) | boolTypeError$ condCheck = Ok
+typeCheck db (IfCom cond bloc1 bloc2) | boolTypeError$ condCheck = Ok
+                            | not$ (traceShowId ret1) == Return NullExpr = Er "First block of IfCom has return"
+                            | not$ (traceShowId ret2) == Return NullExpr = Er "Second block of IfCom has return"
                               | otherwise = addMessage "IfCom" condCheck
       where
         condCheck = typeCheckCondition cond db
+        ret1 = findRetinBloc$ fromBlock bloc1
+        ret2 = findRetinBloc$ fromBlock bloc2
 typeCheck _ _ = Ok
 
 ----------Tests which tests if the correct error arises-------------------
@@ -326,8 +355,12 @@ typeCheck_test_mincom2 = runChecksfromString "{ int x; x-= ya;}"
             == [Er "Type error in Min Command x"]
 typeCheck_test_while1 = runChecksfromString "{ while(ya >= 2){ int x;};}"
             == [Er "Not same type in Gq Condtion in While"]
-typeCheck_test_ifcomand = runChecksfromString "{ if(ya >= 2){ int x;}{};}"
+typeCheck_test_ifcomand1 = runChecksfromString "{ if(ya >= 2){ int x;}{};}"
             == [Er "Not same type in Gq Condtion in IfCom"]
+typeCheck_test_ifcomand2 = runChecksfromString "{ if(ya >= 2){ int x;}{ return 3;};}"
+            == [Er "Second block of IfCom has return"]
+typeCheck_test_ifcomand3 = runChecksfromString "{ if(ya >= 2){ return 3;}{ int x;};}"
+            == [Er "First block of IfCom has return"]
 typeCheck_test_ifexpr1 = runChecksfromString "{ int x = int ?(2==ya){2}{2} ;}"
             == [Er "Not same type in Eq Condtion in IfExpr in VarDecl x"]
 typeCheck_test_ifexpr2 = runChecksfromString "{ int x = int ? (ya >= ya) {ya}{2};}"
@@ -374,11 +407,11 @@ typeExpr (IfExpr typ cond e1 e2 ) db | cmp2 && cmp3 && conCorrectness = Crt  typ
                                      | cmp3  = addMessage "IfExpr and first expr is wrong type" condcomp
                                      | otherwise = Er "Both exprs in IfExpr are wrong"
         where
-          t1 =traceShowId$ getType $  typeExpr e1 db
+          t1 =getType $  typeExpr e1 db
           t2 = getType $ typeExpr e2 db
           cmp2 = t1 == typ
           cmp3 = t2 == typ
-          condcomp = traceShowId$ typeCheckCondition cond db
+          condcomp = typeCheckCondition cond db
           conCorrectness = boolTypeError condcomp
 
 typeExpr (Identifier x ) db = findinDb x db
@@ -451,10 +484,12 @@ checkCorrectFuncExpr db (Funct name args ) | fst param = comparaParamsandArgs db
 
 checkCorrectFuncCommand :: [DataBase] -> Commands-> TypeError
 checkCorrectFuncCommand db (FunCall name args ) | fst  param == False = Er "Could not find Method in DB"
-                                           |comparaParamsandArgs db (snd param) args = Ok
+                                           | not $(boolTypeError byRefCorr) = byRefCorr
+                                           | comparaParamsandArgs db (snd param) args = Ok
                                            | otherwise = Er "Function's arguments are not correct"
   where
     param = findMethodParamsDB db name
+    byRefCorr =checkRefParam (snd param) args
 -- checkCorrectFuncCommand_test1 = symbolTableBuilder_test "{ func int fib(int x,& int y){return 0}; int x = fib (2, nu);}"
 
 
@@ -472,11 +507,6 @@ showErrorinDB (x:db)= showErrorinDB db
 addTypeErrstoDB:: [TypeError] -> [DataBase] -> [DataBase]
 addTypeErrstoDB [] db = db
 addTypeErrstoDB (x:xs) db =Err (Arg SimplyNull "") x :addTypeErrstoDB xs db
-
-
-
-
-
 
 
 
