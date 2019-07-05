@@ -10,7 +10,7 @@ data Commands = VarDecl ArgType Expr          -- DONE IMPLEMENTED IN GENERATOR
               | GlobalVarDecl ArgType Expr
               | FunDecl ArgType [Param] Bloc
               | FunCall String [Expr]
-              | Fork Bloc
+              | Fork Expr
               | Join
               | Print Expr                -- DONE IMPLEMENTED IN GENERATOR
               | Ass String Expr           -- DONE IMPLEMENTED IN GENERATOR
