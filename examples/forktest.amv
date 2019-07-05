@@ -1,0 +1,18 @@
+{
+global int a = 500;
+
+func void ninehundred() {
+    a = 900;
+    print a;
+};
+
+func void million() {
+  a = 1000000;
+  print a;
+};
+
+fork ninehundred();
+fork million();
+join;
+print a;
+}
