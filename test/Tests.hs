@@ -81,8 +81,7 @@ pt = [
         },
     ParseT {
         testName = "parseBlock_test1",
-        testParse =  parse parseBlock "" "{ nop;nop;}" ==
-              (Right (Block [Nop,Nop,End]))
+        testParse =  parseBlock_test1
         },
     ParseT {
         testName = "parseIfCom_tesst2",
@@ -126,25 +125,17 @@ pt = [
         testName = "increaseOffset_test2",
         testParse = increaseOffset [(1,0),(2,4)] 2 == [(1,0),(2,5)]
         },
-    ParseT {
-        testName = "treeBuilder_test1",
-        testParse = treeBuilder_test1 == treeBuilder_test1_correct
-        },
-    ParseT {
-        testName = "treeBuilder_test2",
-        testParse = treeBuilder_test2 == treeBuilder_test2_correct
-        },
 
     ------------------------------------------------------------------------
 -------------------------------TypeChcking Tests-------------------------------------
     ------------------------------------------------------------------------
     ParseT {
         testName = "typeCheck_test_vadecl1",
-        testParse = typeCheck_test_vadecl1 == [Er "VarDecl x wrong type assigned"]
+        testParse = typeCheck_test_vadecl1
         },
     ParseT {
         testName = "typeCheck_test_globalvadecl2",
-        testParse = typeCheck_test_globalvadecl2 == [Er "GlobalVarDecl x wrong type assigned"]
+        testParse = typeCheck_test_globalvadecl2
         }
     ]
 
