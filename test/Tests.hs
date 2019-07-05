@@ -1,4 +1,3 @@
-module Tests where
 
 
 import Parser
@@ -11,9 +10,7 @@ import Text.ParserCombinators.Parsec
 
 data ParseTest =  ParseT { testName :: String, testParse :: Bool }
 
--- name :: ParseTest -> String
 
--- problems = [ParseTest]
 pt = [
       ------------------------------------------------------------------------
 -------------------------------Expression parsing Tests-------------------------------------
@@ -136,6 +133,18 @@ pt = [
     ParseT {
         testName = "treeBuilder_test2",
         testParse = treeBuilder_test2 == treeBuilder_test2_correct
+        },
+
+    ------------------------------------------------------------------------
+-------------------------------TypeChcking Tests-------------------------------------
+    ------------------------------------------------------------------------
+    ParseT {
+        testName = "typeCheck_test_vadecl1",
+        testParse = typeCheck_test_vadecl1 == [Er "VarDecl x wrong type assigned"]
+        },
+    ParseT {
+        testName = "typeCheck_test_globalvadecl2",
+        testParse = typeCheck_test_globalvadecl2 == [Er "GlobalVarDecl x wrong type assigned"]
         }
     ]
 
