@@ -11,9 +11,7 @@ import Text.ParserCombinators.Parsec
 
 data ParseTest =  ParseT { testName :: String, testParse :: Bool }
 
--- name :: ParseTest -> String
 
--- problems = [ParseTest]
 pt = [
       ------------------------------------------------------------------------
 -------------------------------Expression parsing Tests-------------------------------------

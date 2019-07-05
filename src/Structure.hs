@@ -1,6 +1,11 @@
 module Structure where
 
 
+
+data Bloc = Block [Commands]
+      deriving (Eq,Show)
+
+
 data Commands = VarDecl ArgType Expr          -- DONE IMPLEMENTED IN GENERATOR
               | GlobalVarDecl ArgType Expr
               | FunDecl ArgType [Param] Bloc
@@ -28,10 +33,6 @@ data ArgType = Arg Type String -- Bol String | Int String | Void String
       deriving (Eq,Show)
 
 data Type = SimplyBol | SimplyInt | SimplyNull
-      deriving (Eq,Show)
-
-
-data Bloc = Block [Commands]
       deriving (Eq,Show)
 
 
@@ -68,3 +69,32 @@ stringArtgType (Arg _ x ) = x
 fromRight :: b -> Either a b -> b
 fromRight b (Left _) = b
 fromRight _ (Right b) = b
+
+isLeft :: Either a b -> Bool
+isLeft(Left _ ) = True
+isLeft(Right _) = False
+
+
+-----------------Errors-------------------------------
+data TypeError = Er String | Ok | Crt Type
+      deriving (Eq,Show)
+
+
+
+boolTypeError :: TypeError -> Bool
+boolTypeError (Ok)= True
+boolTypeError (Crt _ )= True
+boolTypeError (Er _ )= False
+
+getType :: TypeError -> Type
+getType (Crt a) =  a
+getType (Ok ) = SimplyNull
+getType (Er _ ) = SimplyNull
+
+
+stringTypeError (Er message ) = message
+
+addMessage ::String -> TypeError ->TypeError
+addMessage soure (Er message) = Er (message ++ " in " ++soure)
+addMessage soure (Ok) = error "ok erro"
+addMessage soure (Crt _ ) = Er soure
