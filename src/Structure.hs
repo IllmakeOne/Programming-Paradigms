@@ -96,5 +96,5 @@ stringTypeError (Er message ) = message
 
 addMessage ::String -> TypeError ->TypeError
 addMessage soure (Er message) = Er (message ++ " in " ++soure)
-addMessage soure (Ok) = error "ok erro"
+addMessage soure (Ok) = Er soure
 addMessage soure (Crt _ ) = Er soure
