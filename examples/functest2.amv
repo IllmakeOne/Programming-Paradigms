@@ -1,8 +1,9 @@
 {
 global int jesse = 1000;
 global int robert = 3000;
-func void add(& int koekjes) {
-    jesse = 999;
+func void add(int koekjes) {
+    //jesse += koekjes;
+    koekjes = robert;
 };
 //int baas = 123;
 add(jesse);

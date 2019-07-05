@@ -19,7 +19,7 @@ generation xs tCount = threadStuff ++ threadBusy
             EndProg]
   where
     commands = fromBlock xs
-    smTable = treeBuilder commands 1 []
+    smTable = symbolTableBuilder commands 1 []
     threadBusy = [ComputeI Sprockell.Add regSprID 30 regB,
                   WriteInstr reg0 (IndAddr regB),
                   Jump (Abs 9)]

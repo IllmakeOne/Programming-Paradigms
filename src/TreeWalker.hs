@@ -180,14 +180,14 @@ onlyGlobals (x:db) = onlyGlobals db
 -- needed in the Generator
 getOffset :: [DataBase] -> String -> (Int, Int)
 getOffset [] _ = error "getOffset error"
--- getOffSet (DBF (Arg fType fName) params) =
+getOffset (DBF (Arg fType fName) params _:xs) name = getOffset xs name
 getOffset (DB (Arg argType argName) x y:xs) name
       | argName == name = (x, y)
       | otherwise = getOffset xs name
 
-searchInParams :: [Param] -> String -> Int -> (Int, Int)
-searchInParams [] _ _ = error "TreeWalker:getOffSet:SearchInParams:Parameter not found"
-searchInParams (param:xs) name offs = (-1, -1)
+-- searchInParams :: [Param] -> String -> Int -> (Int, Int)
+-- searchInParams [] _ _ = error "TreeWalker:getOffSet:SearchInParams:Parameter not found"
+-- -- searchInParams ((ByRef ):xs) name offs = (-1, -1)
 
 -- offsetOfParam :: Param -> String -> (Int, Int)
 -- (ByRef (Arg _ name)) =
