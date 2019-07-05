@@ -12,65 +12,47 @@ import Structure
 
 
 --the [DataBasse] is the use as a Symbol Table of sorts
--- it has two type
+-- it has three type
 --  DB which is for the variables of the program,
 --    it keeps track of the variable's name and type in ArgType
 --    and two integers, the first one is the scope of the vribale the second is the offset
 -- DBF which is for the functions declared in the program
 --    it keeps track of the method's name and type in ArgType and it's parameters
+-- Err is used to stored errors that are present in the AST being analised
 data DataBase = DB ArgType Int Int | DBF ArgType [Param] Bloc | Err ArgType TypeError
       deriving (Eq,Show)
 
-showErrorinDB :: [DataBase] -> [DataBase]
-showErrorinDB [] = []
-showErrorinDB ((Err ar x):db) =(Err ar x) : showErrorinDB db
-showErrorinDB (x:db)= showErrorinDB db
 
-addTypeErrstoDB:: [TypeError] -> [DataBase] -> [DataBase]
-addTypeErrstoDB [] db = db
-addTypeErrstoDB (x:xs) db =Err (Arg SimplyNull "") x :addTypeErrstoDB xs db
-
-checkCorrectProgram :: String -> (Bool,String)
-checkCorrectProgram stg | not$ (traceShowId$ showErrorinDB dbp) == [] = (False, show (showErrorinDB dbp))
-                        | otherwise = (True, "All correct")
+--this methods takes a String and returns a Bool string touple
+-- the bool is true if there are no errors found in the typechecking and the symbol table creation
+-- if it is falls, the erros that were found are stores
+checkCorrectProgram :: String -> (Bool,[DataBase])
+checkCorrectProgram stg | not$ (traceShowId$ showErrorinDB dbp) == [] = (False, showErrorinDB dbp)
+                        | otherwise = (True, [])
     where
       db = symbolTableBuilder_fromStg stg
-      tcheck = runChecksfromString stg
+      tcheck = typeCheckProgram (fromStCL stg) db
       dbp = addTypeErrstoDB tcheck db
 
 
-checkCorrectProgram_test1 = checkCorrectProgram "{ func int fib (int x) { print x;}; fib(2); }"
+checkCorrectProgram_test1 = checkCorrectProgram "{ func int fib (int x) { print x;}; fib(2); }" ==
+          (False,[Err (Arg SimplyNull "") (Er "Could not find Method in DB in Funcall fib"),Err (Arg SimplyInt "fib") (Er "Method has no return ")])
 
-checkCorrectProgram_report = checkCorrectProgram "{ int x =2; bool x = ya ; func int fib (int x) { print x;}; func int other (int x) { return ya;}; fib (2);}"
-delete3 = parse parseBlock ""
+
+checkCorrectProgram_report = checkCorrectProgram "{ int x =2; bool x = ya ; func int fib (int x) { print x;}; func int other (int x) { return ya;}; fib (2);}" ==
+          (False,[Err (Arg SimplyNull "") (Er "Could not find Method in DB in Funcall fib"),Err (Arg SimplyInt "x") (Er "Duplicate declaration in same scope"),Err (Arg SimplyInt "fib") (Er "Method has no return "),Err (Arg SimplyInt "other") (Er "Return type of methods not same type and methods type ")])
 --------------------------------------------------------------------------------
 --------------------------------DataBase Creation-------------------------------------
 --------------------------------------------------------------------------------
 
 --String to Command List
 fromStCL :: String -> [Commands]
-fromStCL prog | isLeft parsed = error "Not parsed correclty"
+fromStCL prog | isLeft parsed = error "Not parsed correctly"
               | otherwise = fromBlock$ fromRight (Block [])  (parse parseBlock "" prog)
   where
     parsed =parse parseBlock "" prog
-
---this methods is used to get the current offset of a given scope 'x'
-scopesTracker :: [(Int,Int)] ->Int ->Int
-scopesTracker [] _ = error "Could not find offeset of scope"
-scopesTracker ((a,b):xs) x | a == x = b
-                           | otherwise = scopesTracker xs x
-scopesTracker_test1 = scopesTracker [(1,0),(2,4)] 2
-scopesTracker_test2 = scopesTracker [(1,0),(2,4)] 1
-
---this methods is used to increment the offest of a scope 'x'
---if the scope is not declared yet, declare it with offset 0
-increaseOffset:: [(Int, Int)] -> Int -> [(Int, Int)]
-increaseOffset [] x = [(x,0)]
-increaseOffset ((a,b):xs) x | a == x = (a,(b+1)):xs
-                            | otherwise = (a,b):increaseOffset xs x
-increaseOffset_test1 = increaseOffset [(1,0),(2,4)] 2
-increaseOffset_test2 = increaseOffset [] 2
-
+fromStCL_test = fromStCL "{ func int fib (int x) { print x;}; fib(2); }" ==
+                    [FunDecl (Arg SimplyInt "fib") [ByVal (Arg SimplyInt "x")] (Block [Print (Identifier "x"),End]),FunCall "fib" [Constant 2],End]
 
 --this methods creates the DataBase/symbol table list
 --  which would be used for type checking and in computing
@@ -111,24 +93,40 @@ symbolTableBuilder ((FunDecl arg args bloc):xs) scope off | boolTypeError dupTes
 
 symbolTableBuilder ((Fork bloc):xs) scope off =
     symbolTableBuilder (fromBlock bloc) (scope+1) off ++ symbolTableBuilder xs scope off
+
 symbolTableBuilder (x:xs) scope off = symbolTableBuilder xs scope off
 
+--this methods takes a string , parses it and then creates the symbol table for it, withtout the type errros
+symbolTableBuilder_fromStg :: String -> [DataBase]
 symbolTableBuilder_fromStg string | isLeft parsed = error "Not parsed correctly "
                                   | otherwise = symbolTableBuilder (fromBlock ( fromRight (Block [])  parsed)) 1 []
      where
        parsed = (parse parseBlock "" string)
 
-symbolTableBuilder_test1 = symbolTableBuilder_fromStg   "{ global int z = 3 ;func int fib(int x, & int y){ int x =2 ;return y;}; int x = fib (ya, 2);func int fibi(int x, & int y){ int x =2 ;return y;};}"
-
-
+symbolTableBuilder_test1 = symbolTableBuilder_fromStg
+      "{ global int z = 3 ;func int fib(int x, & int y){ int x =2 ;return y;}; int x = fib (ya, 2);func int fibi(int x, & int y){ int x =2 ;return y;};}"
 symbolTableBuilder_test2 = symbolTableBuilder_fromStg
       "{ global int a = 0 ;global bool b = ya; int c = 1; bool d; global bool e;func void aux(){ int b = 0;}; }"
-
 symbolTableBuilder_test3 = showErrorinDB$ symbolTableBuilder_fromStg
       "{ func int fib (int x) { print x;}; fib(2); }"
 delete2 = parse parseBlock "" "{ func int fib (int x) { print x;}; }"
 
+--this methods is used to get the current offset of a given scope 'x'
+scopesTracker :: [(Int,Int)] ->Int ->Int
+scopesTracker [] _ = error "Could not find offeset of scope"
+scopesTracker ((a,b):xs) x | a == x = b
+                           | otherwise = scopesTracker xs x
+scopesTracker_test1 = scopesTracker [(1,0),(2,4)] 2
+scopesTracker_test2 = scopesTracker [(1,0),(2,4)] 1
 
+--this methods is used to increment the offest of a scope 'x'
+--if the scope is not declared yet, declare it with offset 0
+increaseOffset:: [(Int, Int)] -> Int -> [(Int, Int)]
+increaseOffset [] x = [(x,0)]
+increaseOffset ((a,b):xs) x | a == x = (a,(b+1)):xs
+                            | otherwise = (a,b):increaseOffset xs x
+increaseOffset_test1 = increaseOffset [(1,0),(2,4)] 2 == [(1,0),(2,5)]
+increaseOffset_test2 = increaseOffset [] 2 == [(2,0)]
 
 --this methods seraches for the return in a list of commands
 -- used in -> symbolTableBuilder for fundecl for checking if a method has the corret  return type
@@ -414,6 +412,17 @@ checkCorrectFuncCommand db (FunCall name args ) | fst  param == False = Er "Coul
 
 
 
+--methods that filters out all the NON-erros from the Symbol Table
+showErrorinDB :: [DataBase] -> [DataBase]
+showErrorinDB [] = []
+showErrorinDB ((Err ar x):db) =(Err ar x) : showErrorinDB db
+showErrorinDB (x:db)= showErrorinDB db
+
+--adds an array of TypeErros into a symbol Table
+-- method used to put together all the erros of a program
+addTypeErrstoDB:: [TypeError] -> [DataBase] -> [DataBase]
+addTypeErrstoDB [] db = db
+addTypeErrstoDB (x:xs) db =Err (Arg SimplyNull "") x :addTypeErrstoDB xs db
 
 
 

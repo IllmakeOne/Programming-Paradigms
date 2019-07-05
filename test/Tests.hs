@@ -1,4 +1,3 @@
-module Tests where
 
 
 import Parser
