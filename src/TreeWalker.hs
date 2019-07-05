@@ -92,8 +92,6 @@ symbolTableBuilder ((FunDecl arg param bloc):xs) scope off
           | otherwise = Crt$ exprTypeFromRet (onlyGlobals db) param bloc blocReturn
       --ret is the return type of the methods being declared
 
-symbolTableBuilder ((Fork bloc):xs) scope off =
-    symbolTableBuilder (fromBlock bloc) (scope+1) off ++ symbolTableBuilder xs scope off
 
 symbolTableBuilder (x:xs) scope off = symbolTableBuilder xs scope off
 
