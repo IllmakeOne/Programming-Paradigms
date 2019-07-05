@@ -1,10 +1,11 @@
 {
 global int jesse = 1000;
-
-func void add(& int jesse) {
-    jesse = 123;
+global int robert = 3000;
+func void add(& int koekjes) {
+    jesse = 999;
 };
-add(666);
+//int baas = 123;
+add(jesse);
 print jesse;
 
 }

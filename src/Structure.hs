@@ -3,8 +3,8 @@ module Structure where
 
 data Commands = VarDecl ArgType Expr          -- DONE IMPLEMENTED IN GENERATOR
               | GlobalVarDecl ArgType Expr
-              | FunDecl ArgType [Param] Bloc
-              | FunCall String [Expr]
+              | FunDecl ArgType [Param] Bloc -- DONE
+              | FunCall String [Expr] -- DONE
               | Fork Bloc
               | Join
               | Print Expr                -- DONE IMPLEMENTED IN GENERATOR

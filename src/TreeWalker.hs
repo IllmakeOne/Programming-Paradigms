@@ -148,10 +148,17 @@ onlyGlobals (x:db) = onlyGlobals db
 -- needed in the Generator
 getOffset :: [DataBase] -> String -> (Int, Int)
 getOffset [] _ = error "getOffset error"
+-- getOffSet (DBF (Arg fType fName) params) =
 getOffset (DB (Arg argType argName) x y:xs) name
       | argName == name = (x, y)
       | otherwise = getOffset xs name
 
+searchInParams :: [Param] -> String -> Int -> (Int, Int)
+searchInParams [] _ _ = error "TreeWalker:getOffSet:SearchInParams:Parameter not found"
+searchInParams (param:xs) name offs = (-1, -1)
+
+-- offsetOfParam :: Param -> String -> (Int, Int)
+-- (ByRef (Arg _ name)) =
 
 --this methods checks if a variable/method has been declared before
 --variables are compared to varaibles withing the same scope and with global variables
