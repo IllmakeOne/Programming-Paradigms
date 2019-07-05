@@ -57,7 +57,6 @@ parseFactor = try (Constant <$> integer)
       <|> try (Identifier <$> identifier)
       <|> try ((reserved "ya"  >> return (BoolConst True ))) -- parse Constant true
       <|> try ((reserved "nu"  >> return (BoolConst False ))) -- parse Constant falses
-      <|> try parseExpr
 parsefactor_testCosnt = parse parseFactor "" "2" == Right (Constant 2)
 parsefactor_testIdent = parse parseFactor "" "x" == Right (Identifier "x")
 parsefactor_testFunct = parse parseFactor "" "fib(2,3,ya)" == Right (Funct "fib" [Constant 2,Constant 3,BoolConst True])
@@ -155,6 +154,7 @@ parseArrayCommands_test1 = parse parseArrayCommands "" "nop;nop;" == Right [Nop,
 parseWhile::Parser Commands
 parseWhile = While <$>(reserved "while" *>parens parseCondition) <*> parseBlock
 parseWhile_test1 = parse parseWhile "" "while ( x < 2 ) { x++;};" == Right (While (Lt (Identifier "x") (Constant 2)) (Block [Incr "x",End]))
+parseWhile_test2 = parse parseWhile "" "while (ya >= 2) { int x;};" ==Right (While (Gq (BoolConst True) (Constant 2)) (Block [VarDecl (Arg SimplyInt "x") (Constant 0),End]))
 
 --parses function call
 parseFuncCall::Parser Commands
