@@ -52,7 +52,7 @@ parseTerm_test2 = parse parseTerm "" "2*4*4" == Right (Mult (Constant 2) (Mult (
 parseFactor :: Parser Expr
 parseFactor = try (Constant <$> integer)
       <|> try parseIfExpr
-      <|> try (Funct <$> identifier<*> parens arguments)
+      <|> try parseExprFunCall
       <|> try (Paren <$> parens parseExpr)
       <|> try (Identifier <$> identifier)
       <|> try ((reserved "ya"  >> return (BoolConst True ))) -- parse Constant true
@@ -63,7 +63,8 @@ parsefactor_testFunct = parse parseFactor "" "fib(2,3,ya)" == Right (Funct "fib"
 parsefactor_testIfexpr = parse parseFactor "" "int ?(2<x){2+x}{2+3}" == Right (IfExpr SimplyInt (Lt (Constant 2) (Identifier "x")) (Add (Constant 2) (Identifier "x")) (Add (Constant 2) (Constant 3)))
 
 
-
+parseExprFunCall :: Parser Expr
+parseExprFunCall = try (Funct <$> identifier<*> parens arguments)
 --parses a list of expression
 --it is used only in -> parseFactor while parsing a exprfunction call
 arguments :: Parser [Expr]
@@ -114,7 +115,7 @@ parseCommand = try parseVarDecl
            <|> try parseIfCom
            <|> try parseFunDecl
            <|> try (reserved "join"  >> return Join )
-           <|> try (Fork<$>(reserved"fork" *> parseBlock))
+           <|> try (Fork<$>(reserved"fork" *> parseExprFunCall))
            <|> try (Return<$>(reserved "return" *> parseExpr))
            <|> try parseNop
            <|> try parsePrint
@@ -125,7 +126,7 @@ parseCommand = try parseVarDecl
            <|> try parseFuncCall
            <|> try parseWhile
 parseCommand_testJoin = parse parseCommand "" "join ;" == Right Join
-parseCommand_testFork = parse parseCommand "" "fork { int x = 2;};" == Right (Fork (Block [VarDecl (Arg SimplyInt "x") (Constant 2),End]))
+parseCommand_testFork = parse parseCommand "" "fork fib(2,3);"
 parseCommand_testReturn = parse parseCommand "" "return int ?(x<2) {2}{3};" == Right (Return (IfExpr SimplyInt (Lt (Identifier "x") (Constant 2)) (Constant 2) (Constant 3)))
 
 
@@ -268,12 +269,6 @@ params :: Parser [Param]
 params = commaSep (parseParam)
 params_test1 = parse params "" "& bool h, \n int x, \n bool x"
         == Right [ByRef (Arg SimplyBol "h"),ByVal (Arg SimplyInt "x"),ByVal (Arg SimplyBol "x")]
-
-
-bigtest = parse parseBlock ""
-          "{ int jesse = 1000; global int robert = 1000; while(robert == 0){ jesse++;}; int marieke = 5000; func int transfer(& int from,& int to, int amount) { jesse++; if (from >= amount) { from -= amount; to += amount;} {};}; func void helicopterMoney(int to, int amount) { to += amount;  };  fork { helicopterMoney(jesse, 9000);};  fork { helicopterMoney(robert, 9000);}; join;  print  jesse;  };"
-          == Right (Block [VarDecl (Arg SimplyInt "jesse") (Constant 1000),GlobalVarDecl (Arg SimplyInt "robert") (Constant 1000),While (Eq (Identifier "robert") (Constant 0)) (Block [Incr "jesse",End]),VarDecl (Arg SimplyInt "marieke") (Constant 5000),FunDecl (Arg SimplyInt "transfer") [ByRef (Arg SimplyInt "from"),ByRef (Arg SimplyInt "to"),ByVal (Arg SimplyInt "amount")] (Block [Incr "jesse",IfCom (Gq (Identifier "from") (Identifier "amount")) (Block [MinCom "from" (Identifier "amount"),AddCom "to" (Identifier "amount"),End]) (Block [End]),End]),FunDecl (Arg SimplyNull "helicopterMoney") [ByVal (Arg SimplyInt "to"),ByVal (Arg SimplyInt "amount")] (Block [AddCom "to" (Identifier "amount"),End]),Fork (Block [FunCall "helicopterMoney" [Identifier "jesse",Constant 9000],End]),Fork (Block [FunCall "helicopterMoney" [Identifier "robert",Constant 9000],End]),Join,Print (Identifier "jesse"),End])
-
 
 
 
