@@ -56,6 +56,11 @@ data Condition = Lt Expr Expr -- DONE IMPLEMENTED IN GENERATOR
       deriving (Eq,Show)
 
 
+getParamType :: Param -> Type
+getParamType (ByVal (Arg x _)) =  x
+getParamType (ByRef (Arg x _)) =  x
+
+
 
 fromBlock :: Bloc -> [Commands]
 fromBlock (Block a) =  a

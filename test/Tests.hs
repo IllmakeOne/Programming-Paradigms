@@ -110,6 +110,10 @@ pt = [
         testName = "increaseOffset_test2",
         testParse = increaseOffset_test2
         },
+    ParseT {
+        testName = "typeCheckProgram_test3",
+        testParse = typeCheckProgram_test3
+        },
 
     ------------------------------------------------------------------------
 -------------------------------TypeChcking Tests-------------------------------------
@@ -121,6 +125,26 @@ pt = [
     ParseT {
         testName = "typeCheck_test_globalvadecl2",
         testParse = typeCheck_test_globalvadecl2
+        },
+    ParseT {
+        testName = "typeCheckProgram_test1",
+        testParse = typeCheckProgram_test1
+        },
+    ParseT {
+        testName = "typeCheck_test_addcom2",
+        testParse = typeCheck_test_addcom2
+        },
+    ParseT {
+        testName = "typeCheck_test_funcall2",
+        testParse = typeCheck_test_funcall2
+        },
+    ParseT {
+        testName = "typeCheck_test_globalvadecl2",
+        testParse = typeCheck_test_globalvadecl2
+        },
+    ParseT {
+        testName = "typeCheckProgram_test1",
+        testParse = typeCheckProgram_test1
         }
     ]
 
