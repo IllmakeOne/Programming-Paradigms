@@ -92,10 +92,18 @@ symbolTableBuilder ((FunDecl arg param bloc):xs) scope off
           | otherwise = Crt$ exprTypeFromRet (onlyGlobals db) param bloc blocReturn
       --ret is the return type of the methods being declared
 
+symbolTableBuilder ((While _ bloc):xs) scope off = db
+    where
+      db = symbolTableBuilder (fromBlock bloc ++ xs) scope off
+
+symbolTableBuilder ((IfCom _ bloc1 bloc2):xs) scope off = db
+    where
+      db = symbolTableBuilder (fromBlock bloc1 ++ fromBlock bloc2 ++ xs) scope off
 
 symbolTableBuilder (x:xs) scope off = symbolTableBuilder xs scope off
 
-
+symbolTableBuilder_while_test = symbolTableBuilder_fromStg "{ int x; while(x<10){ int y; int q; };int z;int k; }"
+symbolTableBuilder_if_test = symbolTableBuilder_fromStg "{ int x; if(x<10){ int y; int q; }{ int l;};int z;int k; }"
 
 -- auxiliary method used in -> symbolTableBuilder FuncDecl case
 --  it creates variable declaration commnad out fo the parameters
@@ -104,6 +112,7 @@ paramtoCom :: [Param] -> [Commands]
 paramtoCom [] = []
 paramtoCom ((ByVal arg):xs) = VarDecl arg NullExpr : paramtoCom xs
 paramtoCom ((ByRef arg):xs) = VarDecl arg NullExpr : paramtoCom xs
+
 
 
 --checks if by referece parameters are not simple values
