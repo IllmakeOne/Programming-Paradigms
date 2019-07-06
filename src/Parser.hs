@@ -45,8 +45,8 @@ parseCommand_testReturn = parse parseCommand "" "return int ?(x<2) {2}{3};" == R
 --parses a block, used in all the commands which have blocks , fundecl, while etc
 --a program is a block, so when an entire program has to be parsed, parseBlock would be called
 parseBlock :: Parser Bloc
-parseBlock = Block <$> (reserved "{" *>  addEnd)
-parseBlock_test1 = parse parseBlock "" "{ nop;nop;}" == Right (Block [Nop,Nop,End])
+parseBlock = Block <$> (symbol "{" *>  addEnd)
+parseBlock_test1 = parse parseBlock "" "{nop;nop;}" == Right (Block [Nop,Nop,End])
 parseBlock_test2 = fromRight (Block []) (parse parseBlock "" "{ int x = 2;nop;}") == Block [VarDecl (Arg SimplyInt "x") (Constant 2),Nop,End]
 
 
@@ -55,7 +55,7 @@ parseBlock_test2 = fromRight (Block []) (parse parseBlock "" "{ int x = 2;nop;}"
 -- it expect ";" after each command, so function declarations, ifcommands and while statements
 --        _have_ to have a ";" after they end their blocks with "}
 addEnd :: Parser [Commands]
-addEnd = (++) <$> parseArrayCommands <*> ((:)<$>(reserved "}" >> return End) <*> pure [])
+addEnd = (++) <$> parseArrayCommands <*> ((:)<$>(symbol "}" >> return End) <*> pure [])
 addEnd_test1 = parse addEnd "" "nop;}" == Right [Nop,End]
 
 --methods that parses an array of commands, used in -> addEnd
