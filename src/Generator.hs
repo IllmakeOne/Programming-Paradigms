@@ -100,10 +100,12 @@ genBlock commands tCount smTable offset scope oldFnTable = jumpOverFuncs
                             ++ mainCode ++ (traceShow smTable) []
   where
     (functions, body) = partition isFunction commands
-    (_, fnOffset, generatedFunctions, fnTable) = genFuncs functions tCount smTable offsAndJump offsAndJump scope []
-    jumpOverFuncs = jumpOrNot (length generatedFunctions + length functions)
+    (_, fnOffset, generatedFunctions, fnTable) = genFuncs functions tCount smTable offsAndJump offsAndJump (scope+1) []
+    jumpOverFuncs = jumpOrNot (length generatedFunctions + jumpFuncs (length functions))
     (mainOffs, mainCode) = genCommands body tCount smTable (oldFnTable ++ fnTable) (offsAndJump + length generatedFunctions) (scope+1)
     offsAndJump = offset + length jumpOverFuncs
+    jumpFuncs len | len > 1 = len - (len-1)
+                  | otherwise = 0
 
 -- Helper function to return the function declarations and their offsets, and passing the offsets and function table.
 genFuncs :: [Commands] -> Int -> [DataBase] -> Int -> Int -> Int -> [(String, Int)] -> (Int, Int, [Instruction] , [(String, Int)])
@@ -114,7 +116,7 @@ genFuncs (x:xs) tCount smTable offs fOffs scope fnTable = (fOffs, finalOffset, i
     (fOffsNew, finalOffset, otherInstructions, finalFnTable) = genFuncs xs tCount smTable (newOffset + length instructions) newFOffs scope newFnTable
 -- Generate a function and update the function table.
 genFunc :: Commands -> Int -> [DataBase] -> Int -> Int -> Int -> [(String, Int)] -> (Int, Int, [Instruction] , [(String, Int)])
-genFunc (FunDecl (Arg ftype fname) params body) tCount smTable startOffs fOffs scope fnTable = (newOffs, newOffs, code, (fname, fOffs) : fnTable)
+genFunc (FunDecl (Arg ftype fname) params body) tCount smTable startOffs fOffs scope fnTable = (newOffs, fOffs, code, (fname, fOffs) : fnTable)
      where
        newOffs = startOffs + length code
        before = [Debug ("************func prologue: " ++ fname),
@@ -489,6 +491,7 @@ genFunctionCall fName params tCount smTable fnTable offset scope = (offset + len
         Compute Sprockell.Incr regC regC regC,
         Store regF (IndAddr regC), -- So store the return address
         Compute Sprockell.Add regC reg0 regF,  -- New scope of to the F
+        Debug "Here we goo:",
         Jump (Abs (fnToOff fnTable fName))] -- Let's jump to the actual function
 
 -- Generate the function parameters in reversed order
@@ -552,7 +555,7 @@ getOffset2 smTable name scope = (x, y)
 
 --------- DEBUG REMOVE WHEN DONE!!
 codeGenTest = do
-  result <- parseFromFile parseBlock "../examples/whiletest.amv"
+  result <- parseFromFile parseBlock "../examples/scopetest.amv"
   case result of
     Left err -> print err
     Right xs -> do
@@ -569,7 +572,7 @@ test = [Branch 1 (Rel 6)
   ,Receive 6
   ,Branch 6 (Rel 2)
   ,Jump (Rel (-3))
-  ,Jump (Rel 124)
+  ,Jump (Rel 322)
   ,ReadInstr (DirAddr 0)
   ,Receive 3
   ,Compute Equal 3 0 6
@@ -621,10 +624,10 @@ test = [Branch 1 (Rel 6)
   ,ComputeI Sprockell.Add 1 30 3
   ,WriteInstr 0 (IndAddr 3)
   ,Jump (Abs 9)
-  ,Load (ImmValue 4) 2
+  ,Load (ImmValue 10) 2
   ,Compute Sub 7 2 2
   ,Load (ImmValue 1) 5
-  ,ComputeI Sprockell.Gt 5 1 6
+  ,ComputeI Sprockell.Gt 5 3 6
   ,Branch 6 (Rel 7)
   ,Load (IndAddr 2) 3
   ,Compute Sprockell.Add 7 5 6
@@ -633,20 +636,205 @@ test = [Branch 1 (Rel 6)
   ,ComputeI Sprockell.Add 2 3 2
   ,Jump (Rel (-7))
   ,Compute Sprockell.Add 7 0 4
-  ,ComputeI Sprockell.Add 4 2 4
+  ,ComputeI Sprockell.Add 4 4 4
   ,Store 7 (IndAddr 4)
   ,Compute Sprockell.Add 4 0 7
-  ,Load (ImmValue 900) 6
+  ,Compute Sprockell.Add 7 0 6
+  ,Load (IndAddr 6) 6
+  ,ComputeI Sprockell.Add 6 1 6
+  ,Load (IndAddr 6) 5
+  ,Push 5
+  ,Compute Sprockell.Add 7 0 6
+  ,Load (IndAddr 6) 6
+  ,ComputeI Sprockell.Add 6 3 6
+  ,Load (IndAddr 6) 5
+  ,Push 5
+  ,Pop 3
+  ,Pop 2
+  ,Compute GtE 2 3 4
+  ,Push 4
+  ,Pop 6
+  ,ComputeI Xor 6 1 6
+  ,Branch 6 (Rel 52)
+  ,Compute Sprockell.Add 7 0 4
+  ,ComputeI Sprockell.Add 4 1 4
+  ,Store 7 (IndAddr 4)
+  ,Compute Sprockell.Add 4 0 7
+  ,Compute Sprockell.Add 7 0 6
+  ,Load (IndAddr 6) 6
+  ,Load (IndAddr 6) 6
+  ,ComputeI Sprockell.Add 6 1 6
+  ,Load (IndAddr 6) 5
+  ,Push 5
+  ,Compute Sprockell.Add 7 0 6
+  ,Load (IndAddr 6) 6
+  ,Load (IndAddr 6) 6
+  ,ComputeI Sprockell.Add 6 3 6
+  ,Load (IndAddr 6) 5
+  ,Push 5
+  ,Pop 3
+  ,Pop 2
+  ,Compute Sub 2 3 4
+  ,Push 4
+  ,Compute Sprockell.Add 7 0 6
+  ,Load (IndAddr 6) 6
+  ,Load (IndAddr 6) 6
+  ,ComputeI Sprockell.Add 6 1 6
+  ,Pop 2
+  ,Store 2 (IndAddr 6)
+  ,Push 2
+  ,Compute Sprockell.Add 7 0 6
+  ,Load (IndAddr 6) 6
+  ,Load (IndAddr 6) 6
+  ,ComputeI Sprockell.Add 6 2 6
+  ,Load (IndAddr 6) 5
+  ,Push 5
+  ,Compute Sprockell.Add 7 0 6
+  ,Load (IndAddr 6) 6
+  ,Load (IndAddr 6) 6
+  ,ComputeI Sprockell.Add 6 3 6
+  ,Load (IndAddr 6) 5
+  ,Push 5
+  ,Pop 3
+  ,Pop 2
+  ,Compute Sprockell.Add 2 3 4
+  ,Push 4
+  ,Compute Sprockell.Add 7 0 6
+  ,Load (IndAddr 6) 6
+  ,Load (IndAddr 6) 6
+  ,ComputeI Sprockell.Add 6 2 6
+  ,Pop 2
+  ,Store 2 (IndAddr 6)
+  ,Push 2
+  ,Load (IndAddr 7) 7
+  ,Load (IndAddr 7) 7
+  ,Load (ImmValue 9) 2
+  ,Compute Sub 7 2 2
+  ,ComputeI Sprockell.Add 0 1 5
+  ,ComputeI Sprockell.Gt 5 3 6
+  ,Branch 6 (Rel 23)
+  ,Compute Sprockell.Add 7 5 6
+  ,Load (IndAddr 6) 4
+  ,Load (IndAddr 2) 3
+  ,Compute Sprockell.Lt 3 0 6
+  ,Branch 6 (Rel 2)
+  ,Store 4 (IndAddr 3)
+  ,Compute Sprockell.Incr 2 0 2
+  ,Load (IndAddr 2) 3
+  ,Compute Sprockell.Lt 3 0 6
+  ,Branch 6 (Rel 10)
+  ,Compute Sprockell.Add 3 0 6
+  ,TestAndSet (IndAddr 6)
+  ,Receive 6
+  ,Branch 6 (Rel 2)
+  ,Jump (Rel (-4))
+  ,ComputeI Sprockell.Add 3 1 3
+  ,WriteInstr 4 (IndAddr 3)
+  ,ComputeI Sub 3 1 3
+  ,WriteInstr 0 (IndAddr 3)
+  ,Compute Sprockell.Incr 5 0 5
+  ,ComputeI Sprockell.Add 2 2 2
+  ,Jump (Rel (-23))
+  ,Compute Sprockell.Decr 7 0 2
+  ,Load (IndAddr 2) 6
+  ,Load (IndAddr 7) 7
+  ,Jump (Ind 6)
+  ,Load (ImmValue 1) 2
+  ,Compute Sub 7 2 2
+  ,Load (ImmValue 1) 5
+  ,ComputeI Sprockell.Gt 5 0 6
+  ,Branch 6 (Rel 7)
+  ,Load (IndAddr 2) 3
+  ,Compute Sprockell.Add 7 5 6
+  ,Store 3 (IndAddr 6)
+  ,Compute Sprockell.Incr 5 0 5
+  ,ComputeI Sprockell.Add 2 3 2
+  ,Jump (Rel (-7))
+  ,Compute Sprockell.Add 7 0 4
+  ,ComputeI Sprockell.Add 4 1 4
+  ,Store 7 (IndAddr 4)
+  ,Compute Sprockell.Add 4 0 7
+  ,TestAndSet (DirAddr 1)
+  ,Receive 6
+  ,Branch 6 (Rel 2)
+  ,Jump (Rel (-3))
+  ,Load (ImmValue 1) 6
   ,Push 6
+  ,Load (ImmValue 35) 2
+  ,TestAndSet (IndAddr 2)
+  ,Receive 3
+  ,Branch 3 (Rel 2)
+  ,Jump (Rel (-4))
+  ,Load (ImmValue 36) 4
+  ,ReadInstr (IndAddr 4)
+  ,Receive 5
+  ,Push 5
+  ,WriteInstr 0 (IndAddr 2)
   ,Load (ImmValue 33) 2
   ,TestAndSet (IndAddr 2)
   ,Receive 3
   ,Branch 3 (Rel 2)
   ,Jump (Rel (-4))
   ,Load (ImmValue 34) 4
-  ,Pop 6
-  ,WriteInstr 6 (IndAddr 4)
+  ,ReadInstr (IndAddr 4)
+  ,Receive 5
+  ,Push 5
   ,WriteInstr 0 (IndAddr 2)
+  ,Load (ImmValue 5) 4
+  ,Pop 3
+  ,WriteInstr 3 (IndAddr 4)
+  ,Compute Sprockell.Incr 4 0 4
+  ,Load (ImmValue (-1)) 3
+  ,WriteInstr 3 (IndAddr 4)
+  ,Compute Sprockell.Incr 4 0 4
+  ,Load (ImmValue 33) 3
+  ,WriteInstr 3 (IndAddr 4)
+  ,Compute Sprockell.Incr 4 0 4
+  ,Pop 3
+  ,WriteInstr 3 (IndAddr 4)
+  ,Compute Sprockell.Incr 4 0 4
+  ,Load (ImmValue (-1)) 3
+  ,WriteInstr 3 (IndAddr 4)
+  ,Compute Sprockell.Incr 4 0 4
+  ,Load (ImmValue 35) 3
+  ,WriteInstr 3 (IndAddr 4)
+  ,Compute Sprockell.Incr 4 0 4
+  ,Pop 3
+  ,WriteInstr 3 (IndAddr 4)
+  ,Compute Sprockell.Incr 4 0 4
+  ,Load (ImmValue (-1)) 3
+  ,WriteInstr 3 (IndAddr 4)
+  ,Compute Sprockell.Incr 4 0 4
+  ,Load (ImmValue (-1)) 3
+  ,WriteInstr 3 (IndAddr 4)
+  ,Compute Sprockell.Incr 4 0 4
+  ,Load (ImmValue 3) 5
+  ,WriteInstr 5 (DirAddr 4)
+  ,Load (ImmValue 57) 6
+  ,Push 6
+  ,Pop 5
+  ,WriteInstr 5 (DirAddr 3)
+  ,WriteInstr 0 (DirAddr 2)
+  ,Load (ImmValue 1) 3
+  ,ReadInstr (IndAddr 3)
+  ,Receive 6
+  ,Branch 6 (Rel 2)
+  ,Jump (Rel (-3))
+  ,Compute Equal 0 1 6
+  ,Branch 6 (Rel 3)
+  ,Load (ImmValue 2) 2
+  ,EndProg
+  ,Load (ImmValue 30) 3
+  ,Load (ImmValue 0) 2
+  ,ReadInstr (IndAddr 3)
+  ,Receive 4
+  ,Compute Sprockell.Add 2 4 2
+  ,ComputeI NEq 3 33 6
+  ,Compute Sprockell.Incr 3 0 3
+  ,Branch 6 (Rel (-5))
+  ,Compute Equal 2 0 6
+  ,Branch 6 (Rel 2)
+  ,Jump (Rel (-10))
   ,Load (ImmValue 33) 2
   ,TestAndSet (IndAddr 2)
   ,Receive 3
@@ -659,11 +847,23 @@ test = [Branch 1 (Rel 6)
   ,WriteInstr 0 (IndAddr 2)
   ,Pop 6
   ,WriteInstr 6 (DirAddr 65536)
+  ,Load (ImmValue 35) 2
+  ,TestAndSet (IndAddr 2)
+  ,Receive 3
+  ,Branch 3 (Rel 2)
+  ,Jump (Rel (-4))
+  ,Load (ImmValue 36) 4
+  ,ReadInstr (IndAddr 4)
+  ,Receive 5
+  ,Push 5
+  ,WriteInstr 0 (IndAddr 2)
+  ,Pop 6
+  ,WriteInstr 6 (DirAddr 65536)
   ,Load (IndAddr 7) 7
-  ,Load (ImmValue 3) 2
+  ,Load (ImmValue 0) 2
   ,Compute Sub 7 2 2
   ,ComputeI Sprockell.Add 0 1 5
-  ,ComputeI Sprockell.Gt 5 1 6
+  ,ComputeI Sprockell.Gt 5 0 6
   ,Branch 6 (Rel 23)
   ,Compute Sprockell.Add 7 5 6
   ,Load (IndAddr 6) 4
@@ -693,7 +893,7 @@ test = [Branch 1 (Rel 6)
   ,Jump (Ind 6)
   ,Sprockell.Nop
   ,Sprockell.Nop
-  ,Load (ImmValue 50) 6
+  ,Load (ImmValue 500) 6
   ,Push 6
   ,Pop 6
   ,Load (ImmValue 33) 2
@@ -704,63 +904,424 @@ test = [Branch 1 (Rel 6)
   ,Load (ImmValue 34) 4
   ,WriteInstr 6 (IndAddr 4)
   ,WriteInstr 0 (IndAddr 2)
-  ,TestAndSet (DirAddr 1)
-  ,Receive 6
-  ,Branch 6 (Rel 2)
-  ,Jump (Rel (-3))
-  ,Load (ImmValue 12) 6
+  ,Load (ImmValue 500) 6
   ,Push 6
-  ,Load (ImmValue 5) 4
-  ,Pop 3
-  ,WriteInstr 3 (IndAddr 4)
-  ,Compute Sprockell.Incr 4 0 4
-  ,Load (ImmValue (-1)) 3
-  ,WriteInstr 3 (IndAddr 4)
-  ,Compute Sprockell.Incr 4 0 4
-  ,Load (ImmValue (-1)) 3
-  ,WriteInstr 3 (IndAddr 4)
-  ,Compute Sprockell.Incr 4 0 4
-  ,Load (ImmValue 1) 5
-  ,WriteInstr 5 (DirAddr 4)
-  ------
-  ,Load (ImmValue 57) 5
-  ,WriteInstr 5 (DirAddr 3)
-  ,WriteInstr 0 (DirAddr 2)
-  ,Load (ImmValue 1) 3
-  ,ReadInstr (IndAddr 3)
-  ,Receive 6
-  ,Branch 6 (Rel 2)
-  ,Jump (Rel (-3))
-  ,Compute Equal 0 1 6
-  ,Branch 6 (Rel 3)
-  ,Load (ImmValue 2) 2
-  ,EndProg
-  ,Load (ImmValue 30) 3
-  ,Load (ImmValue 0) 2
-  ,ReadInstr (IndAddr 3)
-  ,Receive 4
-  ,Compute Sprockell.Add 2 4 2
-  ,ComputeI NEq 3 33 6
-  ,Compute Sprockell.Incr 3 3 3
-  ,Branch 6 (Rel (-5))
-  ,Compute Equal 2 0 6
-  ,Branch 6 (Rel 2)
-  ,Jump (Rel (-10))
-  ,Load (ImmValue 33) 2
+  ,Pop 6
+  ,Load (ImmValue 35) 2
   ,TestAndSet (IndAddr 2)
   ,Receive 3
   ,Branch 3 (Rel 2)
-  ,Jump (Rel (-4))
-  ,Load (ImmValue 34) 4
-  ,ReadInstr (IndAddr 4)
-  ,Receive 5
-  ,Push 5
+  ,Jump (Rel (-3))
+  ,Load (ImmValue 36) 4
+  ,WriteInstr 6 (IndAddr 4)
   ,WriteInstr 0 (IndAddr 2)
-  ,Pop 6
-  ,WriteInstr 6 (DirAddr 65536)
+  ,Compute Sprockell.Add 7 0 4
+  ,ComputeI Sprockell.Add 4 1 4
+  ,Load (ImmValue 0) 5
+  ,Load (ImmValue 363) 6
+  ,Push 6
+  ,Pop 5
+  ,Store 5 (IndAddr 4)
+  ,Compute Sprockell.Incr 4 0 4
+  ,Store 7 (IndAddr 4)
+  ,Compute Sprockell.Add 4 0 7
+  ,Load (ImmValue 172) 6
+  ,Push 6
+  ,Pop 2
+  ,Jump (Ind 2)
   ,Load (ImmValue 1) 2
   ,WriteInstr 2 (DirAddr 0)
   ,EndProg]
+-- test = [Branch 1 (Rel 6)
+--   ,TestAndSet (DirAddr 2)
+--   ,Receive 6
+--   ,Branch 6 (Rel 2)
+--   ,Jump (Rel (-3))
+--   ,Jump (Rel 358)
+--   ,ReadInstr (DirAddr 0)
+--   ,Receive 3
+--   ,Compute Equal 3 0 6
+--   ,Branch 6 (Rel 2)
+--   ,EndProg
+--   ,TestAndSet (DirAddr 2)
+--   ,Receive 6
+--   ,Branch 6 (Rel 2)
+--   ,Jump (Rel (-8))
+--   ,ComputeI Sprockell.Add 1 30 3
+--   ,TestAndSet (IndAddr 3)
+--   ,Receive 6
+--   ,Branch 6 (Rel 2)
+--   ,Jump (Rel (-3))
+--   ,ReadInstr (DirAddr 3)
+--   ,Receive 3
+--   ,Push 3
+--   ,ComputeI Sprockell.Add 7 1 4
+--   ,ReadInstr (DirAddr 4)
+--   ,Receive 5
+--   ,Load (ImmValue 5) 2
+--   ,Compute Equal 5 0 6
+--   ,Branch 6 (Rel 18)
+--   ,ReadInstr (IndAddr 2)
+--   ,Receive 3
+--   ,Store 3 (IndAddr 4)
+--   ,Compute Sprockell.Incr 2 0 2
+--   ,Compute Sprockell.Incr 4 0 4
+--   ,ReadInstr (IndAddr 2)
+--   ,Receive 3
+--   ,Store 3 (IndAddr 4)
+--   ,Compute Sprockell.Incr 2 0 2
+--   ,Compute Sprockell.Incr 4 0 4
+--   ,ReadInstr (IndAddr 2)
+--   ,Receive 3
+--   ,Store 3 (IndAddr 4)
+--   ,Compute Sprockell.Incr 2 0 2
+--   ,Compute Sprockell.Incr 4 0 4
+--   ,Compute Sprockell.Decr 5 0 5
+--   ,Jump (Rel (-18))
+--   ,Load (ImmValue 54) 5
+--   ,Store 5 (IndAddr 4)
+--   ,Compute Sprockell.Incr 4 0 4
+--   ,Store 7 (IndAddr 4)
+--   ,Compute Sprockell.Add 4 0 7
+--   ,Pop 2
+--   ,WriteInstr 0 (DirAddr 1)
+--   ,Jump (Ind 2)
+--   ,ComputeI Sprockell.Add 1 30 3
+--   ,WriteInstr 0 (IndAddr 3)
+--   ,Jump (Abs 9)
+--   ,Load (ImmValue 10) 2
+--   ,Compute Sub 7 2 2
+--   ,Load (ImmValue 1) 5
+--   ,ComputeI Sprockell.Gt 5 3 6
+--   ,Branch 6 (Rel 7)
+--   ,Load (IndAddr 2) 3
+--   ,Compute Sprockell.Add 7 5 6
+--   ,Store 3 (IndAddr 6)
+--   ,Compute Sprockell.Incr 5 0 5
+--   ,ComputeI Sprockell.Add 2 3 2
+--   ,Jump (Rel (-7))
+--   ,Compute Sprockell.Add 7 0 4
+--   ,ComputeI Sprockell.Add 4 4 4
+--   ,Store 7 (IndAddr 4)
+--   ,Compute Sprockell.Add 4 0 7
+--   ,Compute Sprockell.Add 7 0 6
+--   ,Load (IndAddr 6) 6
+--   ,ComputeI Sprockell.Add 6 1 6
+--   ,Load (IndAddr 6) 5
+--   ,Push 5
+--   ,Compute Sprockell.Add 7 0 6
+--   ,Load (IndAddr 6) 6
+--   ,ComputeI Sprockell.Add 6 3 6
+--   ,Load (IndAddr 6) 5
+--   ,Push 5
+--   ,Pop 3
+--   ,Pop 2
+--   ,Compute GtE 2 3 4
+--   ,Push 4
+--   ,Pop 6
+--   ,ComputeI Xor 6 1 6
+--   ,Branch 6 (Rel 52)
+--   ,Compute Sprockell.Add 7 0 4
+--   ,ComputeI Sprockell.Add 4 1 4
+--   ,Store 7 (IndAddr 4)
+--   ,Compute Sprockell.Add 4 0 7
+--   ,Compute Sprockell.Add 7 0 6
+--   ,Load (IndAddr 6) 6
+--   ,Load (IndAddr 6) 6
+--   ,ComputeI Sprockell.Add 6 1 6
+--   ,Load (IndAddr 6) 5
+--   ,Push 5
+--   ,Compute Sprockell.Add 7 0 6
+--   ,Load (IndAddr 6) 6
+--   ,Load (IndAddr 6) 6
+--   ,ComputeI Sprockell.Add 6 3 6
+--   ,Load (IndAddr 6) 5
+--   ,Push 5
+--   ,Pop 3
+--   ,Pop 2
+--   ,Compute Sub 2 3 4
+--   ,Push 4
+--   ,Compute Sprockell.Add 7 0 6
+--   ,Load (IndAddr 6) 6
+--   ,Load (IndAddr 6) 6
+--   ,ComputeI Sprockell.Add 6 1 6
+--   ,Pop 2
+--   ,Store 2 (IndAddr 6)
+--   ,Push 2
+--   ,Compute Sprockell.Add 7 0 6
+--   ,Load (IndAddr 6) 6
+--   ,Load (IndAddr 6) 6
+--   ,ComputeI Sprockell.Add 6 2 6
+--   ,Load (IndAddr 6) 5
+--   ,Push 5
+--   ,Compute Sprockell.Add 7 0 6
+--   ,Load (IndAddr 6) 6
+--   ,Load (IndAddr 6) 6
+--   ,ComputeI Sprockell.Add 6 3 6
+--   ,Load (IndAddr 6) 5
+--   ,Push 5
+--   ,Pop 3
+--   ,Pop 2
+--   ,Compute Sprockell.Add 2 3 4
+--   ,Push 4
+--   ,Compute Sprockell.Add 7 0 6
+--   ,Load (IndAddr 6) 6
+--   ,Load (IndAddr 6) 6
+--   ,ComputeI Sprockell.Add 6 2 6
+--   ,Pop 2
+--   ,Store 2 (IndAddr 6)
+--   ,Push 2
+--   ,Load (IndAddr 7) 7
+--   ,Load (IndAddr 7) 7
+--   ,Load (ImmValue 9) 2
+--   ,Compute Sub 7 2 2
+--   ,ComputeI Sprockell.Add 0 1 5
+--   ,ComputeI Sprockell.Gt 5 3 6
+--   ,Branch 6 (Rel 23)
+--   ,Compute Sprockell.Add 7 5 6
+--   ,Load (IndAddr 6) 4
+--   ,Load (IndAddr 2) 3
+--   ,Compute Sprockell.Lt 3 0 6
+--   ,Branch 6 (Rel 2)
+--   ,Store 4 (IndAddr 3)
+--   ,Compute Sprockell.Incr 2 0 2
+--   ,Load (IndAddr 2) 3
+--   ,Compute Sprockell.Lt 3 0 6
+--   ,Branch 6 (Rel 10)
+--   ,Compute Sprockell.Add 3 0 6
+--   ,TestAndSet (IndAddr 6)
+--   ,Receive 6
+--   ,Branch 6 (Rel 2)
+--   ,Jump (Rel (-4))
+--   ,ComputeI Sprockell.Add 3 1 3
+--   ,WriteInstr 4 (IndAddr 3)
+--   ,ComputeI Sub 3 1 3
+--   ,WriteInstr 0 (IndAddr 3)
+--   ,Compute Sprockell.Incr 5 0 5
+--   ,ComputeI Sprockell.Add 2 2 2
+--   ,Jump (Rel (-23))
+--   ,Compute Sprockell.Decr 7 0 2
+--   ,Load (IndAddr 2) 6
+--   ,Load (IndAddr 7) 7
+--   ,Jump (Ind 6)
+--   ,Load (ImmValue 7) 2
+--   ,Compute Sub 7 2 2
+--   ,Load (ImmValue 1) 5
+--   ,ComputeI Sprockell.Gt 5 2 6
+--   ,Branch 6 (Rel 7)
+--   ,Load (IndAddr 2) 3
+--   ,Compute Sprockell.Add 7 5 6
+--   ,Store 3 (IndAddr 6)
+--   ,Compute Sprockell.Incr 5 0 5
+--   ,ComputeI Sprockell.Add 2 3 2
+--   ,Jump (Rel (-7))
+--   ,Compute Sprockell.Add 7 0 4
+--   ,ComputeI Sprockell.Add 4 3 4
+--   ,Store 7 (IndAddr 4)
+--   ,Compute Sprockell.Add 4 0 7
+--   ,Compute Sprockell.Add 7 0 6
+--   ,Load (IndAddr 6) 6
+--   ,ComputeI Sprockell.Add 6 1 6
+--   ,Load (IndAddr 6) 5
+--   ,Push 5
+--   ,Compute Sprockell.Add 7 0 6
+--   ,Load (IndAddr 6) 6
+--   ,ComputeI Sprockell.Add 6 2 6
+--   ,Load (IndAddr 6) 5
+--   ,Push 5
+--   ,Pop 3
+--   ,Pop 2
+--   ,Compute Sprockell.Add 2 3 4
+--   ,Push 4
+--   ,Compute Sprockell.Add 7 0 6
+--   ,Load (IndAddr 6) 6
+--   ,ComputeI Sprockell.Add 6 1 6
+--   ,Pop 2
+--   ,Store 2 (IndAddr 6)
+--   ,Push 2
+--   ,Load (IndAddr 7) 7
+--   ,Load (ImmValue 6) 2
+--   ,Compute Sub 7 2 2
+--   ,ComputeI Sprockell.Add 0 1 5
+--   ,ComputeI Sprockell.Gt 5 2 6
+--   ,Branch 6 (Rel 23)
+--   ,Compute Sprockell.Add 7 5 6
+--   ,Load (IndAddr 6) 4
+--   ,Load (IndAddr 2) 3
+--   ,Compute Sprockell.Lt 3 0 6
+--   ,Branch 6 (Rel 2)
+--   ,Store 4 (IndAddr 3)
+--   ,Compute Sprockell.Incr 2 0 2
+--   ,Load (IndAddr 2) 3
+--   ,Compute Sprockell.Lt 3 0 6
+--   ,Branch 6 (Rel 10)
+--   ,Compute Sprockell.Add 3 0 6
+--   ,TestAndSet (IndAddr 6)
+--   ,Receive 6
+--   ,Branch 6 (Rel 2)
+--   ,Jump (Rel (-4))
+--   ,ComputeI Sprockell.Add 3 1 3
+--   ,WriteInstr 4 (IndAddr 3)
+--   ,ComputeI Sub 3 1 3
+--   ,WriteInstr 0 (IndAddr 3)
+--   ,Compute Sprockell.Incr 5 0 5
+--   ,ComputeI Sprockell.Add 2 2 2
+--   ,Jump (Rel (-23))
+--   ,Compute Sprockell.Decr 7 0 2
+--   ,Load (IndAddr 2) 6
+--   ,Load (IndAddr 7) 7
+--   ,Jump (Ind 6)
+--   ,Load (ImmValue 1) 2
+--   ,Compute Sub 7 2 2
+--   ,Load (ImmValue 1) 5
+--   ,ComputeI Sprockell.Gt 5 0 6
+--   ,Branch 6 (Rel 7)
+--   ,Load (IndAddr 2) 3
+--   ,Compute Sprockell.Add 7 5 6
+--   ,Store 3 (IndAddr 6)
+--   ,Compute Sprockell.Incr 5 0 5
+--   ,ComputeI Sprockell.Add 2 3 2
+--   ,Jump (Rel (-7))
+--   ,Compute Sprockell.Add 7 0 4
+--   ,ComputeI Sprockell.Add 4 1 4
+--   ,Store 7 (IndAddr 4)
+--   ,Compute Sprockell.Add 4 0 7
+--   ,TestAndSet (DirAddr 1)
+--   ,Receive 6
+--   ,Branch 6 (Rel 2)
+--   ,Jump (Rel (-3))
+--   ,Load (ImmValue 50) 6
+--   ,Push 6
+--   ,Load (ImmValue 33) 2
+--   ,TestAndSet (IndAddr 2)
+--   ,Receive 3
+--   ,Branch 3 (Rel 2)
+--   ,Jump (Rel (-4))
+--   ,Load (ImmValue 34) 4
+--   ,ReadInstr (IndAddr 4)
+--   ,Receive 5
+--   ,Push 5
+--   ,WriteInstr 0 (IndAddr 2)
+--   ,Load (ImmValue 5) 4
+--   ,Pop 3
+--   ,WriteInstr 3 (IndAddr 4)
+--   ,Compute Sprockell.Incr 4 0 4
+--   ,Load (ImmValue (-1)) 3
+--   ,WriteInstr 3 (IndAddr 4)
+--   ,Compute Sprockell.Incr 4 0 4
+--   ,Load (ImmValue 33) 3
+--   ,WriteInstr 3 (IndAddr 4)
+--   ,Compute Sprockell.Incr 4 0 4
+--   ,Pop 3
+--   ,WriteInstr 3 (IndAddr 4)
+--   ,Compute Sprockell.Incr 4 0 4
+--   ,Load (ImmValue (-1)) 3
+--   ,WriteInstr 3 (IndAddr 4)
+--   ,Compute Sprockell.Incr 4 0 4
+--   ,Load (ImmValue (-1)) 3
+--   ,WriteInstr 3 (IndAddr 4)
+--   ,Compute Sprockell.Incr 4 0 4
+--   ,Load (ImmValue 2) 5
+--   ,WriteInstr 5 (DirAddr 4)
+--   ,Load (ImmValue 172) 6
+--   ,Push 6
+--   ,Pop 5
+--   ,WriteInstr 5 (DirAddr 3)
+--   ,WriteInstr 0 (DirAddr 2)
+--   ,Load (ImmValue 1) 3
+--   ,ReadInstr (IndAddr 3)
+--   ,Receive 6
+--   ,Branch 6 (Rel 2)
+--   ,Jump (Rel (-3))
+--   ,Compute Equal 0 1 6
+--   ,Branch 6 (Rel 3)
+--   ,Load (ImmValue 2) 2
+--   ,EndProg
+--   ,Load (ImmValue 30) 3
+--   ,Load (ImmValue 0) 2
+--   ,ReadInstr (IndAddr 3)
+--   ,Receive 4
+--   ,Compute Sprockell.Add 2 4 2
+--   ,ComputeI NEq 3 33 6
+--   ,Compute Sprockell.Incr 3 0 3
+--   ,Branch 6 (Rel (-5))
+--   ,Compute Equal 2 0 6
+--   ,Branch 6 (Rel 2)
+--   ,Jump (Rel (-10))
+--   ,Load (ImmValue 33) 2
+--   ,TestAndSet (IndAddr 2)
+--   ,Receive 3
+--   ,Branch 3 (Rel 2)
+--   ,Jump (Rel (-4))
+--   ,Load (ImmValue 34) 4
+--   ,ReadInstr (IndAddr 4)
+--   ,Receive 5
+--   ,Push 5
+--   ,WriteInstr 0 (IndAddr 2)
+--   ,Pop 6
+--   ,WriteInstr 6 (DirAddr 65536)
+--   ,Load (IndAddr 7) 7
+--   ,Load (ImmValue 0) 2
+--   ,Compute Sub 7 2 2
+--   ,ComputeI Sprockell.Add 0 1 5
+--   ,ComputeI Sprockell.Gt 5 0 6
+--   ,Branch 6 (Rel 23)
+--   ,Compute Sprockell.Add 7 5 6
+--   ,Load (IndAddr 6) 4
+--   ,Load (IndAddr 2) 3
+--   ,Compute Sprockell.Lt 3 0 6
+--   ,Branch 6 (Rel 2)
+--   ,Store 4 (IndAddr 3)
+--   ,Compute Sprockell.Incr 2 0 2
+--   ,Load (IndAddr 2) 3
+--   ,Compute Sprockell.Lt 3 0 6
+--   ,Branch 6 (Rel 10)
+--   ,Compute Sprockell.Add 3 0 6
+--   ,TestAndSet (IndAddr 6)
+--   ,Receive 6
+--   ,Branch 6 (Rel 2)
+--   ,Jump (Rel (-4))
+--   ,ComputeI Sprockell.Add 3 1 3
+--   ,WriteInstr 4 (IndAddr 3)
+--   ,ComputeI Sub 3 1 3
+--   ,WriteInstr 0 (IndAddr 3)
+--   ,Compute Sprockell.Incr 5 0 5
+--   ,ComputeI Sprockell.Add 2 2 2
+--   ,Jump (Rel (-23))
+--   ,Compute Sprockell.Decr 7 0 2
+--   ,Load (IndAddr 2) 6
+--   ,Load (IndAddr 7) 7
+--   ,Jump (Ind 6)
+--   ,Sprockell.Nop
+--   ,Sprockell.Nop
+--   ,Load (ImmValue 1000) 6
+--   ,Push 6
+--   ,Pop 6
+--   ,Load (ImmValue 33) 2
+--   ,TestAndSet (IndAddr 2)
+--   ,Receive 3
+--   ,Branch 3 (Rel 2)
+--   ,Jump (Rel (-3))
+--   ,Load (ImmValue 34) 4
+--   ,WriteInstr 6 (IndAddr 4)
+--   ,WriteInstr 0 (IndAddr 2)
+--   ,Compute Sprockell.Add 7 0 4
+--   ,ComputeI Sprockell.Add 4 1 4
+--   ,Load (ImmValue 0) 5
+--   ,Load (ImmValue 388) 6
+--   ,Push 6
+--   ,Pop 5
+--   ,Store 5 (IndAddr 4)
+--   ,Compute Sprockell.Incr 4 0 4
+--   ,Store 7 (IndAddr 4)
+--   ,Compute Sprockell.Add 4 0 7
+--   ,Load (ImmValue 239) 6
+--   ,Push 6
+--   ,Pop 2
+--   ,Jump (Ind 2)
+--   ,Load (ImmValue 1) 2
+--   ,WriteInstr 2 (DirAddr 0)
+--   ,EndProg]
 
 pretty :: [Instruction] -> String
 pretty = pretty' 0

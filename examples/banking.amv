@@ -18,11 +18,11 @@ func void helicopterMoney(& int to, int amount) {
     to += amount;
 };
 
-/*func void atm(& int from, int amount) {
+func void atm(& int from, int amount) {
   if (from >= amount) {
     from -= amount;
   } {};
-};*/
+};
 
 
 fork helicopterMoney(jesse, 50);
