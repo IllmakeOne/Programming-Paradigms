@@ -1,6 +1,7 @@
 
 
 import Parser
+import ParseExpr
 import TreeWalker
 import BasicParsers
 import Structure
@@ -35,6 +36,10 @@ pt = [
     ParseT {
         testName = "parseExpr_testnu",
         testParse =  parseExpr_testnu
+        },
+    ParseT {
+        testName = "parseExpr_test3",
+        testParse =  parseExpr_test3
         },
     ParseT {
         testName = "parseExpr_test1",
