@@ -209,13 +209,13 @@ onlyGlobals (x:db) = onlyGlobals db
 
 --helper method that return the scope and offset of a varaibles based on its name
 -- needed in the Generator
-getOffset :: [DataBase] -> String -> (Int, Int)
-getOffset [] name = error ("getOffset error, cannot find variable: '" ++ name ++ "', did you declare its type properly?")
-getOffset (Err _ (Er message):xs) _ = error message
-getOffset (DBF (Arg fType fName) params _:xs) name = getOffset xs name
-getOffset (DB (Arg argType argName) x y:xs) name
-      | argName == name = (x, y)
-      | otherwise = getOffset xs name
+getOffset :: [DataBase] -> String -> Int -> (Int, Int)
+getOffset [] name _ = error ("getOffset error, cannot find variable: '" ++ name ++ "', did you declare its type properly?")
+getOffset (Err _ (Er message):xs) _  _ = error message
+getOffset (DBF (Arg fType fName) params _:xs) name scope = getOffset xs name scope
+getOffset (DB (Arg argType argName) x y:xs) name scope
+      | argName == name && x <= scope = (x, y)
+      | otherwise = getOffset xs name scope
 
 -- searchInParams :: [Param] -> String -> Int -> (Int, Int)
 -- searchInParams [] _ _ = error "TreeWalker:getOffSet:SearchInParams:Parameter not found"
