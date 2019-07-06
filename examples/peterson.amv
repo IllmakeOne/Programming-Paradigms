@@ -37,7 +37,7 @@ func void pOne() {
   bool flag0AndTurn0 = nu;
   if (flag0 == 1) {
     if (turn == 0) {
-      flag1AndTurn1 = ya;
+      flag0AndTurn0 = ya;
     } {};
   } {};
 
@@ -47,28 +47,20 @@ func void pOne() {
 	};
 
 	// critical section
-	int j = 5;
-	while (j > 0) {
+	int m = 5;
+	while (m > 0) {
 		counter--;
-		j--;
+		m--;
 	};
 	// end of critical section
 	flag1 = nu;
 };
 
-
-int l = 10;
-while (l > 0) {
+func void test() {
 	fork pZero();
 	fork pOne();
-	join;
-	print(counter);
-
-	fork pOne();
-	fork pZero();
 	join;
 	print counter;
-
-	l--;
 };
+test();
 }

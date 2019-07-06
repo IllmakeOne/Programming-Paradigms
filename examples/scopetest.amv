@@ -4,6 +4,10 @@ global int b = 600;
 global int c = 500;
 
 func void transfer(& int from, & int to, int amount) {
+  if (from >= amount) {
+		from -= amount;
+		to += amount;
+	} {};
 };
 
 func void lol () {
@@ -15,10 +19,10 @@ func void jee () {
 func void test () {
   print a;
   print b;
+  transfer(a, b, 1);
+  print a;
+  print b;
 };
 
 test();
-
-print a;
-print b;
 }

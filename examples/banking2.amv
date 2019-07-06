@@ -1,7 +1,17 @@
 {
-global int jesse = 1000;
+global int jesse = 10000;
+global int robert = 2000;
+global int marieke = 99999;
 
-print jesse;
+func void helicopterMoney(& int acc, int amount) {
+    acc += amount;
+};
+
+func void atm(& int acc, int amount) {
+    if (acc >= amount) {
+      acc -= amount;
+    } {};
+};
 
 func void transfer(& int from, & int to, int amount) {
     if (from >= amount) {
@@ -10,15 +20,18 @@ func void transfer(& int from, & int to, int amount) {
       } {};
 };
 
-
-func void helicopterMoney(& int to, int amount) {
-    to += amount;
-};
-
 func void test() {
-  fork helicopterMoney(jesse, 50);
-  join;
   print jesse;
+  print robert;
+  print marieke;
+
+  helicopterMoney(jesse, 100);
+  helicopterMoney(robert, 100);
+  helicopterMoney(marieke, 1);
+
+  print jesse;
+  print robert;
+  print marieke;
 };
 
 test();

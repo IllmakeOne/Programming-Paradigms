@@ -104,7 +104,7 @@ genBlock commands tCount smTable offset scope oldFnTable = jumpOverFuncs
     jumpOverFuncs = jumpOrNot (length generatedFunctions + jumpFuncs (length functions))
     (mainOffs, mainCode) = genCommands body tCount smTable (oldFnTable ++ fnTable) (offsAndJump + length generatedFunctions) (scope+1)
     offsAndJump = offset + length jumpOverFuncs
-    jumpFuncs len | len > 1 = len - (len-1)
+    jumpFuncs len | len > 1 = len - (len-1) -- for nested functions need to remove actually
                   | otherwise = 0
 
 -- Helper function to return the function declarations and their offsets, and passing the offsets and function table.
@@ -555,14 +555,14 @@ getOffset2 smTable name scope = (x, y)
 
 --------- DEBUG REMOVE WHEN DONE!!
 codeGenTest = do
-  result <- parseFromFile parseBlock "../examples/scopetest.amv"
+  result <- parseFromFile parseBlock "../examples/peterson.amv"
   case result of
     Left err -> print err
     Right xs -> do
       --print $ treeBuilder (fromBlock xs) 1 []
       putStrLn (pretty code) -- print code
-      run $ replicate threadAmount code
-      --runWithDebugger (debuggerSimplePrint myShow) $ replicate threadAmount code
+      --run $ replicate threadAmount code
+      runWithDebugger (debuggerSimplePrint myShow) $ replicate threadAmount code
       where
         code = generation xs threadAmount
         threadAmount = 3 -- <<<<<<<<<<<<<<<<<<<<<
