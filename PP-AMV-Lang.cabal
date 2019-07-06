@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 066fe38711b66b578793f235353af7e5f92ff033e769f6250d55895857e3b3f0
+-- hash: c5305e49cefbc0605d64b8da7ef43cced8a585bfac0597fa3de7352934caef0c
 
 name:           PP-AMV-Lang
 version:        0.1.0.0
@@ -20,9 +20,11 @@ extra-source-files:
 
 library
   exposed-modules:
+      BasicParsers
       Generator
       Lib
       Parser
+      Structure
       TreeWalker
   other-modules:
       Paths_PP_AMV_Lang
@@ -38,7 +40,6 @@ library
 executable amv
   main-is: Compiler.hs
   other-modules:
-      Main
       Paths_PP_AMV_Lang
   hs-source-dirs:
       app
@@ -53,7 +54,7 @@ executable amv
 
 test-suite amv-test
   type: exitcode-stdio-1.0
-  main-is: Spec.hs
+  main-is: Tests.hs
   other-modules:
       Paths_PP_AMV_Lang
   hs-source-dirs:

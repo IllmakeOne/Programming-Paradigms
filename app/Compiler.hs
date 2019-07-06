@@ -7,82 +7,39 @@ import Control.Monad
 import Parser
 import Sprockell
 import Generator
+import Structure
+import Text.Read
 
 main = do args <- getArgs
-          case length args of
-               0 -> askForFile
-               2-> command args
-               otherwise -> putStrLn "AMV compiler takes only 0 or 2 arguments"
+          commandParser args
 
-command :: [String] -> IO ()
-command args = do
-  case args !! 0 of
-    "ast" -> makeAST $ args !! 1
-    "gen" -> generate $ args !! 1
-    otherwise -> putStrLn "ALRIGHT WE're going to compile (not implemented yet)"
+commandParser :: [String] -> IO()
+commandParser ["c", file, tCount] = generateAndRun file (readMaybe tCount)
+commandParser ["ast", file] = printAST file
+commandParser ["gen", file, tCount] = printSpril file (readMaybe tCount)
+commandParser _ = putStrLn $ "AMv compiler usage: c <file> <threadAmount> (compile and run file)\n"
+                          ++ "                  |ast <file> (get the AST of file)\n"
+                          ++ "                  |gen <file> <threadAmount> (print sprockell code of file)"
 
-makeAST :: String -> IO ()
-makeAST file = do
+generateAndRun :: String -> Maybe Int -> IO ()
+generateAndRun file (Just tCount) = do
+  result <- parseFromFile parseBlock file
+  case result of
+    Left err -> print err
+    Right xs -> run $ replicate tCount $ generation xs tCount
+generateAndRun _ _ = error "Please specify the amount of threads as an Int"
+
+printAST :: String -> IO ()
+printAST file = do
   result <- parseFromFile parseBlock file
   case result of
     Left err -> print err
     Right xs -> print xs
 
-generate :: String -> IO ()
-generate file = do
+printSpril :: String -> Maybe Int -> IO ()
+printSpril file (Just tCount) = do
   result <- parseFromFile parseBlock file
   case result of
     Left err -> print err
-    Right xs -> run [generation xs] -- generation from Generator
-
-
--- runProg :: [Instruction] -> IO ()
--- runprog run =
-
-askForFile :: IO ()
-askForFile = putStrLn "Je moeder"
-
-
-
--- -- openFileWithName :: String -> IO Handle
--- openFileWithName fileName = openFile fileName ReadMode
---
--- -- getFileContents :: String -> IO String
--- getFileContents fileName = hGetContents $ openFileWithName fileName
-
--- compile :: String -> IO ()
--- compile file = do
---   handle <- openFile file ReadMode
---   contents <- hGetContents handle
---   putStr contents
-
-
-
--- main :: IO ()
--- main args | length args == 0 = askForFile
---           | length args == 1 = compile
---           where
---             args = getArgs
-
-
-
-
-
--- flushStr :: String -> IO ()
--- flushStr str = putStr str >> hFlush stdout
---
--- readPrompt :: String -> IO String
--- readPrompt prompt = flushStr prompt >> getLine
---
--- until_ :: Monad m => (a -> Bool) -> m a -> (a -> m ()) -> m ()
--- until_ pred prompt action = do
---   result <- prompt
---   if pred result
---      then return ()
---      else action result >> until_ pred prompt action
---
--- evalAndPrint :: String -> IO ()
--- evalAndPrint expr =  evalString expr >>= putStrLn
---
--- runRepl :: IO ()
--- runRepl = until_ (== "quit") (readPrompt "AMV>>> ") evalAndPrint
+    Right xs -> putStrLn $ pretty $ generation xs tCount
+printSpril _ _ = error "Please specify the amount of threads as an Int"

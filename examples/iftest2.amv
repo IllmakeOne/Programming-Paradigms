@@ -1,0 +1,4 @@
+{
+bool x = ya;
+if (x == nu) { print 0;}{ print 1;};
+}

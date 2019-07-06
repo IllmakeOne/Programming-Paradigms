@@ -127,6 +127,7 @@ data Instruction = Compute Operator RegAddr RegAddr RegAddr     -- Compute op r0
                  | Branch RegAddr Target                        -- Branch r t: conditional jump, depending on register r
                                                                 --      if r contains 0: don't jump; otherwise: jump
 
+                 | BranchX RegAddr Target                       -- Same as Branch as above but now r contains 1: jump, otherwise not.
                  | Load AddrImmDI RegAddr                       -- Load (ImmValue n) r: put value n in register r
                                                                 -- Load (DirAddr a) r : put value on memory address a in r
                                                                 -- Load (IndAddr p) r : ibid, but memory address is in register p
@@ -201,11 +202,16 @@ data IOCode     = IONone                                        -- code to instr
                 | IOTest
                 deriving (Eq,Show)
 
+data BranchCode = BN -- branch normal
+                | BX -- branch x
+                | BNS -- branch not set
+
+                deriving (Eq, Show)
 data MachCode = MachCode                                        -- machine code: fields contain codes as described above
         { ldCode        :: LdCode
         , stCode        :: StCode
         , aguCode       :: AguCode
-        , branch        :: Bool
+        , branch        :: BranchCode
         , tgtCode       :: TargetCode
         , spCode        :: SPCode
         , aluCode       :: Operator

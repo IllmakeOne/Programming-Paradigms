@@ -210,7 +210,8 @@ onlyGlobals (x:db) = onlyGlobals db
 --helper method that return the scope and offset of a varaibles based on its name
 -- needed in the Generator
 getOffset :: [DataBase] -> String -> (Int, Int)
-getOffset [] _ = error "getOffset error"
+getOffset [] name = error ("getOffset error, cannot find variable: '" ++ name ++ "', did you declare its type properly?")
+getOffset (Err _ (Er message):xs) _ = error message
 getOffset (DBF (Arg fType fName) params _:xs) name = getOffset xs name
 getOffset (DB (Arg argType argName) x y:xs) name
       | argName == name = (x, y)

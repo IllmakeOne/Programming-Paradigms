@@ -6,24 +6,24 @@ data Bloc = Block [Commands]
       deriving (Eq,Show)
 
 
-data Commands = VarDecl ArgType Expr          -- DONE IMPLEMENTED IN GENERATOR
+data Commands = VarDecl ArgType Expr
               | GlobalVarDecl ArgType Expr
               | FunDecl ArgType [Param] Bloc
               | FunCall String [Expr]
               | Fork Expr
               | Join
-              | Print Expr                -- DONE IMPLEMENTED IN GENERATOR
-              | Ass String Expr           -- DONE IMPLEMENTED IN GENERATOR
-              | IfCom Condition Bloc Bloc -- DONE IMPLEMENTED IN GENERATOR
-              | While Condition Bloc      -- DONE IMPLEMENTED IN GENERATOR
-              | Incr String         -- DONE IMPLEMENTED IN GENERATOR
-              | Decr String         -- DONE IMPLEMENTED IN GENERATOR
-              | AddCom String Expr  -- DONE IMPLEMENTED IN GENERATOR
-              | MinCom String Expr  -- DONE IMPLEMENTED IN GENERATOR
+              | Print Expr
+              | Ass String Expr
+              | IfCom Condition Bloc Bloc
+              | While Condition Bloc
+              | Incr String
+              | Decr String
+              | AddCom String Expr
+              | MinCom String Expr
               | Comment String      --TODO use endby
-              | Nop                 -- DONE IMPLEMENTED IN GENERATOR
-              | End                 -- DONE IMPLEMENTED IN GENERATOR
-              | Return Expr -- DONE
+              | Nop
+              | End
+              | Return Expr
             deriving (Eq,Show)
 
 data Param = ByVal ArgType | ByRef ArgType

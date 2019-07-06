@@ -1,5 +1,3 @@
-
-
 import Parser
 import TreeWalker
 import BasicParsers
@@ -128,31 +126,11 @@ pt = [
 runTests :: [ParseTest] -> Bool
 runTests (x:xs) | testParse x = runTests xs
                 -- | otherwise = ( print (testName x)  >> return False)
-                | otherwise = error ((testName x)++" failed")
+                | otherwise = error ("Tests: " ++ testName x ++" failed!")
 runTests [] = True
 
-
-main | runTests pt = print "All tests which should pass, passed"
-     | otherwise = error " Something very wrong in main test"
-
-
-
--- ughguh = runTests pt `catchError` print "sadasdas"
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-treeBuilder_test1_correct = [DB (Arg SimplyInt "z") 0 0,DBF (Arg SimplyInt "fib") [ByVal (Arg SimplyInt "x"),ByRef (Arg SimplyInt "y")] (Block [VarDecl (Arg SimplyInt "x") (Constant 2),Return (Identifier "y"),End]),DB (Arg SimplyInt "x") 2 1,DB (Arg SimplyInt "x") 1 0,DBF (Arg SimplyInt "fibi") [ByVal (Arg SimplyInt "x"),ByRef (Arg SimplyInt "y")] (Block [VarDecl (Arg SimplyInt "x") (Constant 2),Return (Identifier "y"),End]),DB (Arg SimplyInt "x") 2 1]
-treeBuilder_test2_correct = [DB (Arg SimplyInt "a") 0 0,DB (Arg SimplyBol "b") 0 1,DB (Arg SimplyInt "c") 1 0,DB (Arg SimplyBol "d") 1 1,DB (Arg SimplyBol "e") 0 2,DBF (Arg SimplyNull "aux") [] (Block [VarDecl (Arg SimplyInt "b") (Constant 0),End]),DB (Arg SimplyInt "b") 2 1]
+main :: IO ()
+main = do
+  let success = runTests pt
+  if success then putStrLn "All frontend tests which should pass, passed"
+             else error " Something went wrong in main test"

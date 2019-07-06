@@ -65,7 +65,7 @@ nullcode = MachCode
         { ldCode   = LdImm
         , stCode   = StNone
         , aguCode  = AguDir
-        , branch   = False
+        , branch   = BNS
         , tgtCode  = NoJump
         , spCode   = Flat
         , aluCode  = Or
@@ -91,9 +91,14 @@ decode instr = case instr of
                                    Ind r       -> nullcode {tgtCode=TInd, regY=r}
 
   Branch cReg target          -> case target of
-                                   Abs n       -> nullcode {branch=True, tgtCode=TAbs, regX=cReg, immValue=n}
-                                   Rel n       -> nullcode {branch=True, tgtCode=TRel, regX=cReg, immValue=n}
-                                   Ind r       -> nullcode {branch=True, tgtCode=TInd, regX=cReg, regY=r}
+                                   Abs n       -> nullcode {branch=BN, tgtCode=TAbs, regX=cReg, immValue=n}
+                                   Rel n       -> nullcode {branch=BN, tgtCode=TRel, regX=cReg, immValue=n}
+                                   Ind r       -> nullcode {branch=BN, tgtCode=TInd, regX=cReg, regY=r}
+
+  BranchX cReg target          -> case target of
+                                   Abs n       -> nullcode {branch=BX, tgtCode=TAbs, regX=cReg, immValue=n}
+                                   Rel n       -> nullcode {branch=BX, tgtCode=TRel, regX=cReg, immValue=n}
+                                   Ind r       -> nullcode {branch=BX, tgtCode=TInd, regX=cReg, regY=r}
 
   Load memAddr toReg          -> case memAddr of
                                    ImmValue n  -> nullcode {loadReg=toReg, ldCode=LdImm, immValue=n}
@@ -228,20 +233,24 @@ store mem stCode (address,value) = case stCode of
 -- =====================================================================================
 -- nextPC: to calculate next program counter
 -- =====================================================================================
-nextPC :: Bool -> TargetCode -> (Value,Reply) -> (Value,Value,Value) -> Value
+nextPC :: BranchCode -> TargetCode -> (Value,Reply) -> (Value,Value,Value) -> Value
 nextPC branch tgtCode (x,reply) (pc,n,y) =
 
         case  (branch, tgtCode, x/=0,  reply  )  of
 
-              ( True , TAbs   , True,    _    )  -> n
-              ( True , TRel   , True,    _    )  -> pc + n
-              ( True , TInd   , True,    _    )  -> y
+              ( BN , TAbs   , True,    _    )  -> n
+              ( BN , TRel   , True,    _    )  -> pc + n
+              ( BN , TInd   , True,    _    )  -> y
 
-              ( False, TAbs   ,  _  ,    _    )  -> n
-              ( False, TRel   ,  _  ,    _    )  -> pc + n
-              ( False, TInd   ,  _  ,    _    )  -> y
+              ( BX , TAbs   , False,    _    )  -> n
+              ( BX , TRel   , False,    _    )  -> pc + n
+              ( BX , TInd   , False,    _    )  -> y
 
-              ( False, Waiting,  _  , Nothing )  -> pc
+              ( BNS, TAbs   ,  _  ,    _    )  -> n
+              ( BNS, TRel   ,  _  ,    _    )  -> pc + n
+              ( BNS, TInd   ,  _  ,    _    )  -> y
+
+              ( BNS, Waiting,  _  , Nothing )  -> pc
 
               (  _   ,   _    ,  _  ,    _    )  -> pc + 1
 

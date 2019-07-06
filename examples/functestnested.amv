@@ -1,0 +1,10 @@
+{
+func void add(int toAdd) {
+    func int addTwo(int num2) {
+      return num2 + 2;
+    };
+    int a = addTwo(toAdd);
+    print a;
+};
+add(5);
+}
