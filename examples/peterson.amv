@@ -9,23 +9,22 @@ func void pZero() {
 	flag0 = ya;
 	turn = 1;
 
-  bool flag1AndTurn1 = nu;
-  if (flag1 == 1) {
-    if (turn == 1) {
-      flag1AndTurn1 = ya;
-    } {};
-  } {};
-
+	bool flag1AndTurn1 = ya;
 	while (flag1AndTurn1 == ya) {
-		  // busy wait
+		if (flag1 == nu) {
+			if (turn == 0) {
+				flag1AndTurn1 = nu;
+			} {};
+		} {};
 	};
 
 	// critical section
-	int j = 5;
-	while (j > 0) {
-		counter++;
-		j--;
-	};
+	counter++;
+	counter++;
+	counter++;
+	counter++;
+	counter++;
+
 	// end of critical section
 	flag0 = nu;
 };
@@ -34,33 +33,30 @@ func void pOne() {
 	flag1 = ya;
 	turn = 0;
 
-  bool flag0AndTurn0 = nu;
-  if (flag0 == 1) {
-    if (turn == 0) {
-      flag0AndTurn0 = ya;
-    } {};
-  } {};
-
-
+	bool flag0AndTurn0 = ya;
 	while (flag0AndTurn0 == ya) {
-		// busy wait
+		if (flag0 == nu) {
+			if (turn == 1) {
+				flag0AndTurn0 = nu;
+			} {};
+		} {};
 	};
 
-	// critical section
-	int m = 5;
-	while (m > 0) {
-		counter--;
-		m--;
-	};
+	counter--;
+	counter--;
+	counter--;
+	counter--;
+	counter--;
 	// end of critical section
 	flag1 = nu;
 };
 
-func void test() {
+global int l = 10;
+while (l > 0) {
 	fork pZero();
 	fork pOne();
 	join;
 	print counter;
+	l--;
 };
-test();
 }

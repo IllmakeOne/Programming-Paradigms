@@ -1,0 +1,10 @@
+{
+
+int flag1AndTurn1 = 555;
+
+func void test() {
+  print flag1AndTurn1;
+};
+
+test();
+}

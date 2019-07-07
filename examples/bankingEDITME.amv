@@ -7,16 +7,16 @@ func void deposit(& int account, int amount) {
 	account += amount;
 };
 
-func void withdraw(& int account, int amount) {
-	if (account >= amount) {
-		account -= amount;
+func void withdraw(& int from, int am) {
+	if (from >= am) {
+		from -= am;
 	} {};
 };
 
-func void transfer(& int sender, & int target, int amount) {
-	if (sender >= amount) {
-		sender -= amount;
-		target += amount;
+func void transfer(& int sender, & int target, int ami) {
+	if (sender >= ami) {
+		sender -= ami;
+		target += ami;
 	} {};
 };
 
@@ -32,7 +32,7 @@ func void test() {
   print john;
   print jane;
   print martijn;
-  /*
+
 	fork deposit(jane, 200);
 	fork withdraw(john, 200);
 	fork deposit(martijn, 2000);
@@ -65,7 +65,7 @@ func void test() {
   print john;
   print jane;
   print martijn;
-  */
+
 
 
 };
