@@ -1,12 +1,12 @@
 {
-int jesse = 1000;
-int blablabla = 3;
+int thousand = 1000;
+print thousand;
 
-func void add(& int jesse) {
-    jesse += 3;
-    print jesse;
+func void add(& int am) {
+    am += 3;
+    print am;
 };
 
-add(jesse);
-print jesse;
+add(thousand);
+print thousand;
 }

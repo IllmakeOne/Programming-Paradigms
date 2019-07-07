@@ -1,11 +1,10 @@
 {
 int jesse = 1000;
-//comments examples
 print jesse;
 
 
 int marieke = 9999;
-if (jesse == 1000) {
+if (jesse < 1000) {
   print marieke;
 } {
   print jesse;

@@ -561,7 +561,7 @@ getOffset2 smTable name scope = (x, y, isFnParam) -- traceShow (scope, name, x, 
 
 --------- DEBUG REMOVE WHEN DONE!!
 codeGenTest = do
-  result <- parseFromFile parseBlock "../examples/functest.amv"
+  result <- parseFromFile parseBlock "../examples/banking.amv"
   case result of
     Left err -> print err
     Right xs -> do

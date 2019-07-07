@@ -1,12 +1,8 @@
 {
-int jesse = (3+4)*2-2*2; // 10
-while (jesse > 0) {
-  int kaas = 3;
-  print jesse;
-  // Works also: jesse--;
-  jesse--;
-  //jesse -= 5;
-  print kaas;
+int ten = (3+4)*2-2*2; // 10
+while (ten > 0) {
+  print ten;
+  ten--;
 };
-print jesse;
+print ten;
 }

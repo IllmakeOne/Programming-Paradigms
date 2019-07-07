@@ -5,10 +5,6 @@ global bool flag1 = nu;
 global int turn = 0;
 global int counter = 0;
 
-//global bool flag0AndTurn0 = ya;
-//global bool flag1AndTurn1 = ya;
-
-
 func void pZero() {
 	flag0 = ya;
 	turn = 0;
@@ -23,11 +19,11 @@ func void pZero() {
 	};
 
 	// critical section
-	counter++;
-	counter++;
-	counter++;
-	counter++;
-	counter++;
+	counter--;
+	counter--;
+	counter--;
+	counter--;
+	counter--;
 
 	// end of critical section
 	flag0 = nu;
@@ -46,21 +42,21 @@ func void pOne() {
 		} {};
 	};
 
-	counter--;
-	counter--;
-	counter--;
-	counter--;
-	counter--;
+	counter++;
+	counter++;
+	counter++;
+	counter++;
+	counter++;
 	// end of critical section
 	flag1 = nu;
 };
 
-global int l = 10;
-while (l > 0) {
+int i = 10;
+while (i > 0) {
 	fork pZero();
 	fork pOne();
 	join;
 	print counter;
-	l--;
+	i--;
 };
 }

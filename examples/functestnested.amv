@@ -1,9 +1,9 @@
 {
-func void add(int toAdd) {
-    func int addTwo(int num2) {
-      return num2 + 2;
+func void add() {
+    func int two() {
+      return 2;
     };
-    print addTwo(toAdd);
+    print two();
 };
-add(5);
+add();
 }

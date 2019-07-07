@@ -1,6 +1,6 @@
 {
-global int jesse = 10000;
-global int robert = 2000;
+global int jesse = 1000;
+global int robert = 5000;
 global int marieke = 99999;
 
 
