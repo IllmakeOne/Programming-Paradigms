@@ -23,15 +23,14 @@ fundecl_err4 = checkCorrectProgram "{ global int jesse = 1000;func int add(int a
 ----- tests symbol table building-------------
 symbolTableBuilder_test1 = symbolTableBuilder_fromStg
       "{ global int z = 3 ;func int fib(bool x, & int y){ x =ya ;return y;}; int x = fib (ya, 2);func int fibi(int a, & int b){ a =2 ;return b;};}"
-      == [DB (Arg SimplyInt "z") 0 0,DBF (Arg SimplyInt "fib") [ByVal (Arg SimplyBol "x"),ByRef (Arg SimplyInt "y")] (Block [Ass "x" (BoolConst True),Return (Identifier "y"),End]),DB (Arg SimplyBol "x") 2 1,DB (Arg SimplyInt "y") 2 2,DB (Arg SimplyInt "x") 1 0,DBF (Arg SimplyInt "fibi") [ByVal (Arg SimplyInt "a"),ByRef (Arg SimplyInt "b")] (Block [Ass "a" (Constant 2),Return (Identifier "b"),End]),DB (Arg SimplyInt "a") 2 1,DB (Arg SimplyInt "b") 2 2]
+      == [DB (Arg SimplyInt "z") 0 0 False,DBF (Arg SimplyInt "fib") [ByVal (Arg SimplyBol "x"),ByRef (Arg SimplyInt "y")] (Block [Ass "x" (BoolConst True),Return (Identifier "y"),End]),DB (Arg SimplyBol "x") 2 1 True,DB (Arg SimplyInt "y") 2 2 True,DB (Arg SimplyInt "x") 0 1 False,DBF (Arg SimplyInt "fibi") [ByVal (Arg SimplyInt "a"),ByRef (Arg SimplyInt "b")] (Block [Ass "a" (Constant 2),Return (Identifier "b"),End]),DB (Arg SimplyInt "a") 2 1 True,DB (Arg SimplyInt "b") 2 2 True]
 symbolTableBuilder_test2 = symbolTableBuilder_fromStg
       "{ global int a = 0 ;global bool b = ya; int c = 1; bool d; global bool e;func void aux(){ int b = 0;}; }"
-      == [DB (Arg SimplyInt "a") 0 0,DB (Arg SimplyBol "b") 0 1,DB (Arg SimplyInt "c") 1 0,DB (Arg SimplyBol "d") 1 1,DB (Arg SimplyBol "e") 0 2,DBF (Arg SimplyNull "aux") [] (Block [VarDecl (Arg SimplyInt "b") (Constant 0),End]),DB (Arg SimplyInt "b") 2 1]
-
+      == [DB (Arg SimplyInt "a") 0 0 False,DB (Arg SimplyBol "b") 0 1 False,DB (Arg SimplyInt "c") 0 2 False,DB (Arg SimplyBol "d") 0 2 False,DB (Arg SimplyBol "e") 0 2 False,DBF (Arg SimplyNull "aux") [] (Block [VarDecl (Arg SimplyInt "b") (Constant 0),End]),DB (Arg SimplyInt "b") 2 1 False]
 --this method was used to test if the parameters are correclty added to the function's scopes
 symbolTableBuilder_test4 = symbolTableBuilder_fromStg
                   "{ int x; func int fib(& int x, int y, int z){ return y; };int z =2; }"
-                  == [DB (Arg SimplyInt "x") 1 0,DBF (Arg SimplyInt "fib") [ByRef (Arg SimplyInt "x"),ByVal (Arg SimplyInt "y"),ByVal (Arg SimplyInt "z")] (Block [Return (Identifier "y"),End]),DB (Arg SimplyInt "x") 2 1,DB (Arg SimplyInt "y") 2 2,DB (Arg SimplyInt "z") 2 3,DB (Arg SimplyInt "z") 1 1]
+                == [DB (Arg SimplyInt "x") 0 0 False,DBF (Arg SimplyInt "fib") [ByRef (Arg SimplyInt "x"),ByVal (Arg SimplyInt "y"),ByVal (Arg SimplyInt "z")] (Block [Return (Identifier "y"),End]),DB (Arg SimplyInt "x") 2 1 True,DB (Arg SimplyInt "y") 2 2 True,DB (Arg SimplyInt "z") 2 3 True,DB (Arg SimplyInt "z") 0 0 False]
 -- this method was used to test if it correctly rejects FunCall wiht values instead of indetifies for pram by ref
 symbolTableBuilder_test5 = checkCorrectProgram
       "{ func int fib(& int x){ return x; }; int x = fib(2); }"

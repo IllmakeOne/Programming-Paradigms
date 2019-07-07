@@ -1,0 +1,75 @@
+{
+global int jesse = 10000;
+global int robert = 2000;
+global int marieke = 99999;
+
+
+func void tikkie(& int from, & int to, int amount) {
+    if (from >= amount) {
+        from -= amount;
+        to += amount;
+      } {};
+};
+
+
+func void atm(& int account, int cash) {
+    if (account >= cash) {
+      account -= cash;
+    } {};
+};
+
+func void salary(& int employee, int payment) {
+    employee += payment;
+};
+
+
+
+print jesse;
+print robert;
+print marieke;
+
+fork salary(jesse, 100);
+fork salary(robert, 100);
+fork salary(marieke, 1);
+join;
+
+print jesse;
+print robert;
+print marieke;
+
+fork salary(robert, 50);
+fork atm(jesse, 10);
+fork salary(marieke, 3000);
+join;
+
+print jesse;
+print robert;
+print marieke;
+
+fork atm(jesse, 500);
+fork salary(robert, 400);
+fork atm(marieke, 75);
+join;
+
+print jesse;
+print robert;
+print marieke;
+
+fork atm(jesse, 50);
+fork tikkie(marieke, robert, 10);
+join;
+
+print jesse;
+print robert;
+print marieke;
+
+fork atm(marieke, 50);
+fork tikkie(jesse, robert, 200);
+join;
+
+print jesse;
+print robert;
+print marieke;
+
+
+}

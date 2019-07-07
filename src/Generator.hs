@@ -13,12 +13,12 @@ import Data.List
 -- tCount is the amount of threads.
 generation :: Bloc -> Int -> [Instruction]
 generation xs tCount = before
-  ++ genBlock commands tCount smTable offset 0 []
+  ++ genBlock commands tCount smTable offset 1 []
   ++ final
   ++ [EndProg]
   where
     commands = fromBlock xs
-    smTable = symbolTableBuilder commands 1 []
+    smTable = symbolTableBuilder commands 1 [] False
     (offset, before, final) = threadHelper tCount
 
 
@@ -97,12 +97,12 @@ genBlock :: [Commands] -> Int -> [DataBase] -> Int -> Int -> [(String, Int)] -> 
 genBlock [] _ _ _ _ _ = []
 genBlock commands tCount smTable offset scope oldFnTable = jumpOverFuncs
                             ++ generatedFunctions
-                            ++ mainCode ++ (traceShow smTable) []
+                            ++ mainCode -- ++ (traceShow smTable) []
   where
     (functions, body) = partition isFunction commands
     (_, fnOffset, generatedFunctions, fnTable) = genFuncs functions tCount smTable offsAndJump offsAndJump (scope+1) []
     jumpOverFuncs = jumpOrNot (length generatedFunctions + jumpFuncs (length functions))
-    (mainOffs, mainCode) = genCommands body tCount smTable (oldFnTable ++ fnTable) (offsAndJump + length generatedFunctions) (scope+1)
+    (mainOffs, mainCode) = genCommands body tCount smTable (oldFnTable ++ fnTable) (offsAndJump + length generatedFunctions) (scope) -- scope +1
     offsAndJump = offset + length jumpOverFuncs
     jumpFuncs len | len > 0 = len - (len-1) -- for nested functions need to remove actually
                   | otherwise = 0
@@ -325,13 +325,15 @@ storeParam (Identifier name) tCount smTable scope | x >= 0 =
                                 before = [Pop regB,
                                           Store regB (IndAddr regC),
                                           Compute Sprockell.Incr regC regC regC]
-                                (x, y) = getOffset2 smTable name scope
+                                (x, y, isFnParam) = getOffset2 smTable name scope
                                 after = [Compute Sprockell.Incr regC regC regC,
                                         Load (ImmValue globalMem) regB,
                                         Store regB (IndAddr regC),
                                         Compute Sprockell.Incr regC regC regC]
                                 globalMem | x >= 0 = -1
                                           | otherwise = 30 + tCount + 2*y
+                                replicateAmount x scope | x == scope = 0
+                                                        | otherwise = x-(scope-2)
 storeParam _ _ _ _ = [Pop regB, -- So now it's everything else except a reference to a variable
                     Store regB (IndAddr regC),
                     Compute Sprockell.Incr regC regC regC,
@@ -352,7 +354,7 @@ storeForkParam :: Expr -> Int -> [DataBase] -> Int -> [Instruction]
 storeForkParam (Identifier name) tCount smTable scope | x >= 0 =
                                                         before
                                                         ++ [Compute Sprockell.Add regF reg0 regE]
-                                                        ++ replicate x (Load (IndAddr regE) regE)
+                                                        ++ replicate (x+scope) (Load (IndAddr regE) regE)
                                                         ++ [ComputeI Sprockell.Add regE (y+1) regE,
                                                             WriteInstr regE (IndAddr regC)] -- conc
                                                         ++ after
@@ -365,7 +367,7 @@ storeForkParam (Identifier name) tCount smTable scope | x >= 0 =
                                 before = [Pop regB,
                                           WriteInstr regB (IndAddr regC), --
                                           Compute Sprockell.Incr regC regC regC]
-                                (x, y) = getOffset2 smTable name scope
+                                (x, y, isFnParam) = getOffset2 smTable name scope
                                 after = [Compute Sprockell.Incr regC regC regC,
                                         Load (ImmValue globalMem) regB,
                                         WriteInstr regB (IndAddr regC), --
@@ -385,16 +387,16 @@ storeForkParam _ _ _ _ = [Pop regB, -- So now it's everything else except a refe
 -- the functionTable.
 fnToOff :: [(String, Int)] -> String -> Int
 fnToOff [] st = error $ "Generator: Cannot find function: " ++ st
-fnToOff ((st, i):xs) name | name == st = (traceShow (st, i)) i
+fnToOff ((st, i):xs) name | name == st = i --(traceShow (st, i)) i
                           | otherwise = fnToOff xs name
 
 genVar :: String -> Expr -> Maybe Operator -> Bool -> Int -> [DataBase] -> [(String, Int)] -> Int -> Int-> (Int, [Instruction])
 genVar name expr op globDecl tCount smTable fnTable offset scope | x >= 0 = (offset + length localCode, localCode)
                                                                  | otherwise = (offset + length globalCode, globalCode)
                             where
-                              (x, y) = getOffset2 smTable name scope
+                              (x, y, isFnParam) = getOffset2 smTable name scope
                               (newOffs, loadVarCode) = genExpr expr tCount smTable fnTable offset scope -- Store value in regD
-                              loadVar = loadVarCode ++ memAddr tCount globDecl smTable name scope (x, y) -- Store the eddress in regE
+                              loadVar = loadVarCode ++ memAddr tCount globDecl smTable name scope (x, y, isFnParam) -- Store the eddress in regE
                                         ++ [Pop regD]
                                         ++ genVarCompute op (x, y)
                               localCode  = loadVar ++ [Store regD (IndAddr regE)]
@@ -425,8 +427,8 @@ incrDecrVar name op tCount smTable scope | x >= 0 = loadVar ++ [Load (IndAddr re
                                                   WriteInstr regD (IndAddr regE),
                                                   WriteInstr reg0 (IndAddr regA)]
                               where
-                                (x, y) = getOffset2 smTable name scope
-                                loadVar = memAddr tCount False smTable name scope (x, y)
+                                (x, y, isFnParam) = getOffset2 smTable name scope
+                                loadVar = memAddr tCount False smTable name scope (x, y, isFnParam)
 
 -- Generate an expression and push that to the stack
 genExpr :: Expr -> Int -> [DataBase] -> [(String, Int)] -> Int -> Int -> (Int, [Instruction])
@@ -444,8 +446,8 @@ genExpr (Paren expr) tCount smTable fnTable offset scope = genExpr expr tCount s
 genExpr (Identifier name) tCount smTable _ offset scope | x >= 0 = (offset + length localCode, localCode)
                                                         | otherwise = (offset + length globalCode, globalCode)
                                     where
-                                      (x, y) = getOffset2 smTable name scope
-                                      loadVar = memAddr tCount False smTable name scope (x, y)
+                                      (x, y, isFnParam) = getOffset2 smTable name scope
+                                      loadVar = memAddr tCount False smTable name scope (x, y, isFnParam)
                                       globalAddress = 30 + tCount + 2*y
                                       localCode = loadVar
                                                   ++ [Load (IndAddr regE) regD,
@@ -528,9 +530,10 @@ boolToInt False = 0
 
 
 -- -- Get the memory address for local or global variables
-memAddr :: Int -> Bool -> [DataBase] -> String -> Int -> (Int, Int) -> [Instruction]
-memAddr  tCount globDecl smTable name scope (x, y) | x >= 0 = [Compute Sprockell.Add regF reg0 regE] -- Local
-                                   ++ traceShow(scope) replicate (x-(scope-2)) (Load (IndAddr regE) regE) -- (x-scope) So get the address in regE
+memAddr :: Int -> Bool -> [DataBase] -> String -> Int -> (Int, Int, Bool) -> [Instruction]
+memAddr  tCount globDecl smTable name scope (x, y, isFnParam) | x >= 0 = [Compute Sprockell.Add regF reg0 regE] -- Local
+                                   ++ [Debug ("***xje:" ++ name ++ "! scope:" ++ show scope ++ ", x:" ++ show x ++ ", isFnParam: " ++ show isFnParam) ]
+                                   ++ replicate (replicateAmount x scope isFnParam) (Load (IndAddr regE) regE) -- (x-scope) So get the address in regE
                                    ++ [ComputeI Sprockell.Add regE y regE]
                         | otherwise = [Load (ImmValue globalAddress) regA, -- mr world wide.
                                       TestAndSet (IndAddr regA), -- get the Lock
@@ -541,27 +544,29 @@ memAddr  tCount globDecl smTable name scope (x, y) | x >= 0 = [Compute Sprockell
                                       Load (ImmValue (globalAddress + 1)) regE] -- Now we have the lock get the actual value of the address
 
                         where
+                          -- plusOneDecl decl | decl = 0
+                          --                  | otherwise = -1
                           globalAddress = 30 + tCount + (2*y)
                           jumpTo globDecl | globDecl = -3
                                           | otherwise = -4
+                          replicateAmount x scope isFnParam | not isFnParam && scope == (x+1) = 0
+                                                            | x == scope = 0
+                                                            | otherwise = x-(scope-2)
 -- Get it's offset, but reverse the list to get the latest offset.
-getOffset2 :: [DataBase] -> String -> Int -> (Int, Int)
-getOffset2 smTable name scope = traceShow (name, x, y) (x, y)
+getOffset2 :: [DataBase] -> String -> Int -> (Int, Int, Bool)
+getOffset2 smTable name scope = (x, y, isFnParam) -- traceShow (scope, name, x, y)
   where
-    (x', y) = getOffset smTable name scope --reverse smTable?
-    x = x' - 2 + (scope-1) -- - 1?
-    -- y = y' - 1
-    --y | y' == 0 = 1
-    --  | otherwise = y
+    (x', y, isFnParam) = getOffset smTable name scope
+    x = x' - 2 + (scope-1)
 
 --------- DEBUG REMOVE WHEN DONE!!
 codeGenTest = do
-  result <- parseFromFile parseBlock "../examples/functestnested.amv"
+  result <- parseFromFile parseBlock "../examples/functest.amv"
   case result of
     Left err -> print err
     Right xs -> do
       --print $ treeBuilder (fromBlock xs) 1 []
-      putStrLn (pretty code) -- print code
+      -- putStrLn (pretty code) -- print code
       run $ replicate threadAmount code
       --runWithDebugger (debuggerSimplePrint myShow) $ replicate threadAmount code
       where

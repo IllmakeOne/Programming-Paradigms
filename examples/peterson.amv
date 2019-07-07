@@ -5,9 +5,13 @@ global bool flag1 = nu;
 global int turn = 0;
 global int counter = 0;
 
+//global bool flag0AndTurn0 = ya;
+//global bool flag1AndTurn1 = ya;
+
+
 func void pZero() {
 	flag0 = ya;
-	turn = 1;
+	turn = 0;
 
 	bool flag1AndTurn1 = ya;
 	while (flag1AndTurn1 == ya) {
@@ -31,7 +35,7 @@ func void pZero() {
 
 func void pOne() {
 	flag1 = ya;
-	turn = 0;
+	turn = 1;
 
 	bool flag0AndTurn0 = ya;
 	while (flag0AndTurn0 == ya) {

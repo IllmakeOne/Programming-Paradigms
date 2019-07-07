@@ -1,17 +1,12 @@
 {
 int jesse = 1000;
+int blablabla = 3;
 
 func void add(& int jesse) {
     jesse += 3;
     print jesse;
 };
-print jesse;
-
-
-func void koekjes(& int jesse) {
-    jesse += 3;
-    print jesse;
-};
 
 add(jesse);
+print jesse;
 }

@@ -19,7 +19,7 @@ import Structure
 -- DBF which is for the functions declared in the program
 --    it keeps track of the method's name and type in ArgType and it's parameters
 -- Err is used to stored errors that are present in the AST being analised
-data DataBase = DB ArgType Int Int | DBF ArgType [Param] Bloc | Err ArgType TypeError
+data DataBase = DB ArgType Int Int Bool | DBF ArgType [Param] Bloc | Err ArgType TypeError
       deriving (Eq,Show)
 
 
@@ -57,23 +57,25 @@ fromStCL_test = fromStCL "{ func int fib (int x) { print x;}; fib(2); }" ==
 -- it's second argument, the int , is the scope in which the method is right now
 -- it's second argument should be initiallized with 1, as 0 is reserved for global varaibles
 -- and it's third argument should just be an empty list
-symbolTableBuilder :: [Commands] -> Int ->[(Int, Int)] -> [DataBase]
-symbolTableBuilder [] _ _ = []
-symbolTableBuilder ((VarDecl arg expr):xs) scope off | boolTypeError dupTest = add:db
-                                                     | otherwise = (Err arg dupTest ):db
+symbolTableBuilder :: [Commands] -> Int ->[(Int, Int)] -> Bool -> [DataBase]
+symbolTableBuilder [] _ _ _ = []
+symbolTableBuilder ((VarDecl arg expr):xs) scope off isFnParam | boolTypeError dupTest = add:db
+                                                               | otherwise = (Err arg dupTest ):db
     where
       dupTest= checkDuplicant db arg scope
-      db = symbolTableBuilder xs scope (increaseOffset off scope)
-      add = (DB arg scope (scopesTracker (increaseOffset off scope) scope))
-symbolTableBuilder ((GlobalVarDecl arg expr):xs) scope off |boolTypeError dupTest = add:db
-                                                    | otherwise = (Err arg dupTest ):db
+      db = symbolTableBuilder xs scope (increaseOffset off scope) isFnParam
+      add = (DB arg scopeZeroOrNot (scopesTracker (increaseOffset off scopeZeroOrNot) scopeZeroOrNot) isFnParam)
+      scopeZeroOrNot = if scope - 1 == 0 then 0 else scope
+
+symbolTableBuilder ((GlobalVarDecl arg expr):xs) scope off isFnParam |boolTypeError dupTest = add:db
+                                                      | otherwise = (Err arg dupTest ):db
     where
       dupTest= checkDuplicant db arg 0
-      db = symbolTableBuilder xs scope (increaseOffset off 0)
-      add = (DB arg 0 (scopesTracker (increaseOffset off 0) 0))
+      db = symbolTableBuilder xs scope (increaseOffset off 0) isFnParam
+      add = (DB arg 0 (scopesTracker (increaseOffset off 0) 0) isFnParam)
         -- (DB arg 0 (scopesTracker off scope)): symbolTableBuilder xs scope (increaseOffset off scope)
 
-symbolTableBuilder ((FunDecl arg param bloc):xs) scope off
+symbolTableBuilder ((FunDecl arg param bloc):xs) scope off _
                               | boolTypeError dupTest == False =(Err arg dupTest) : db
                               | boolTypeError ret == False = Err arg ret  :db
                               | typeArgtype arg == getType ret = add:ownscope ++ db
@@ -83,8 +85,10 @@ symbolTableBuilder ((FunDecl arg param bloc):xs) scope off
                               | otherwise = Err arg (Er  "Return type of method not same type and method's type "):db
     where
       dupTest= checkDuplicant db arg scope
-      db = symbolTableBuilder xs scope off
-      ownscope = symbolTableBuilder (((paramtoCom param )++ fromBlock bloc)) (scope+1) (increaseOffset off (scope+1))
+      db = symbolTableBuilder xs scope off False
+      ownscope = paramsTable ++ blockTable
+      paramsTable = symbolTableBuilder (paramtoCom param) (scope+1) (increaseOffset off (scope+1)) True
+      blockTable = symbolTableBuilder (fromBlock bloc) (scope+1) (increaseOffset off (scope+1)) False
       add = (DBF arg param bloc)
       blocReturn = (findRetinBloc $ fromBlock bloc) --the return command of the method
       ret | blocReturn == (Return NullExpr) = Crt SimplyNull
@@ -92,15 +96,15 @@ symbolTableBuilder ((FunDecl arg param bloc):xs) scope off
           | otherwise = Crt$ exprTypeFromRet (onlyGlobals db) param bloc blocReturn
       --ret is the return type of the methods being declared
 
-symbolTableBuilder ((While _ bloc):xs) scope off = db
+symbolTableBuilder ((While _ bloc):xs) scope off _ = db
     where
-      db = symbolTableBuilder (fromBlock bloc ++ xs) scope off
+      db = symbolTableBuilder (fromBlock bloc ++ xs) scope off False
 
-symbolTableBuilder ((IfCom _ bloc1 bloc2):xs) scope off = db
+symbolTableBuilder ((IfCom _ bloc1 bloc2):xs) scope off _ = db
     where
-      db = symbolTableBuilder (fromBlock bloc1 ++ fromBlock bloc2 ++ xs) scope off
+      db = symbolTableBuilder (fromBlock bloc1 ++ fromBlock bloc2 ++ xs) scope off False
 
-symbolTableBuilder (x:xs) scope off = symbolTableBuilder xs scope off
+symbolTableBuilder (x:xs) scope off isFnParam = symbolTableBuilder xs scope off isFnParam
 
 symbolTableBuilder_while_test = symbolTableBuilder_fromStg "{ int x; while(x<10){ int y; int q; };int z;int k; }"
 symbolTableBuilder_if_test = symbolTableBuilder_fromStg "{ int x; if(x<10){ int y; int q; }{ int l;};int z;int k; }"
@@ -128,7 +132,7 @@ checkRefParam [] _ = Er "Fewer parameters than arguments"
 --this methods takes a string , parses it and then creates the symbol table for it, withtout the type errros
 symbolTableBuilder_fromStg :: String -> [DataBase]
 symbolTableBuilder_fromStg string | isLeft parsed = error "Not parsed correctly "
-                                  | otherwise = symbolTableBuilder (fromBlock ( fromRight (Block [])  parsed)) 1 []
+                                  | otherwise = symbolTableBuilder (fromBlock ( fromRight (Block [])  parsed)) 1 [] False
      where
        parsed = (parse parseBlock "" string)
 
@@ -163,9 +167,9 @@ findRetinBloc (x:xs) = findRetinBloc xs
 addByrefParamsDb :: [Param] -> Int ->[(Int, Int)]  -> [DataBase]
 addByrefParamsDb [] _ _ = []
 addByrefParamsDb ((ByVal arg):ps) scope off =
-      (DB arg (scopesTracker (increaseOffset off scope) scope) scope):addByrefParamsDb ps scope (increaseOffset off (scope+1))
+      (DB arg (scopesTracker (increaseOffset off scope) scope) scope True):addByrefParamsDb ps scope (increaseOffset off (scope+1))
 addByrefParamsDb ((ByRef arg):ps) scope off =
-      (DB arg (scopesTracker (increaseOffset off scope) scope) scope):addByrefParamsDb ps scope (increaseOffset off (scope+1))
+      (DB arg (scopesTracker (increaseOffset off scope) scope) scope True):addByrefParamsDb ps scope (increaseOffset off (scope+1))
 addByrefParamsDb_tes1 = addByrefParamsDb [ByVal (Arg SimplyInt "x"),ByRef (Arg SimplyInt "y")] 1 [(0,0)]
 
 
@@ -177,7 +181,7 @@ exprTypeFromRet globalDb param bloc (Return expr) =
    getType$ typeExpr expr db
    where
      paramdb = addByrefParamsDb param 0 []
-     blocdb = symbolTableBuilder (fromBlock bloc) 0 []
+     blocdb = symbolTableBuilder (fromBlock bloc) 0 [] True
      db = paramdb ++ blocdb ++ globalDb
 
 
@@ -185,18 +189,18 @@ exprTypeFromRet globalDb param bloc (Return expr) =
 -- used in -> symbolTableBuilder for fundecl for checking if a method has the corret  return type
 onlyGlobals:: [DataBase] -> [DataBase]
 onlyGlobals [] = []
-onlyGlobals ((DB arg 0 off):db) =(DB arg 0 off) : onlyGlobals db
+onlyGlobals ((DB arg 0 off param):db) =(DB arg 0 off param) : onlyGlobals db
 onlyGlobals (x:db) = onlyGlobals db
 -- onlyGlobals_test1 =
 
 --helper method that return the scope and offset of a varaibles based on its name
 -- needed in the Generator
-getOffset :: [DataBase] -> String -> Int -> (Int, Int)
+getOffset :: [DataBase] -> String -> Int -> (Int, Int, Bool)
 getOffset [] name _ = error ("getOffset error, cannot find variable: '" ++ name ++ "', did you declare its type properly?")
 getOffset (Err _ (Er message):xs) _  _ = error message
 getOffset (DBF (Arg fType fName) params _:xs) name scope = getOffset xs name scope
-getOffset (DB (Arg argType argName) x y:xs) name scope
-      | argName == name && x <= scope = (x, y)
+getOffset (DB (Arg argType argName) x y param:xs) name scope
+      | argName == name && x <= scope = (x, y, param)
       | otherwise = getOffset xs name scope
 
 -- searchInParams :: [Param] -> String -> Int -> (Int, Int)
@@ -211,7 +215,7 @@ getOffset (DB (Arg argType argName) x y:xs) name scope
 -- global variables are compared just wiht other global varaibles
 checkDuplicant :: [DataBase]-> ArgType ->Int -> TypeError
 checkDuplicant [] _ _ = Ok
-checkDuplicant (( DB dbarg sco _):xs) arg scope
+checkDuplicant (( DB dbarg sco _ _):xs) arg scope
       | scope == sco && stringArtgType dbarg == stringArtgType arg = Er "Duplicate declaration in same scope"
       | 0 == sco && stringArtgType dbarg == stringArtgType arg = Er "Var with same name as global variable"
       | otherwise = checkDuplicant xs arg scope
@@ -239,7 +243,7 @@ typeCheckProgram [] _ = []
 
 -- takes a string , parses it, creates a Symbol Table for it and then it runs the type checking
 runChecksfromString stg =
-  typeCheckProgram (fromStCL stg) (symbolTableBuilder (fromStCL stg) 1 [])
+  typeCheckProgram (fromStCL stg) (symbolTableBuilder (fromStCL stg) 1 [] False)
 
 
 --this metiods check is an individial command has the correct type
@@ -257,7 +261,7 @@ typeCheck db (GlobalVarDecl typ ex) | typeArgtype typ == (getType$ typeExpr ex d
                               | otherwise = Er  ("GlobalVarDecl " ++ stringArtgType typ ++ " wrong type assigned")
 
 typeCheck db fun@(FunCall name exprs)
-                              | boolTypeError (traceShowId nomer) == False = nomer
+                              | boolTypeError nomer == False = nomer
                               | not$ boolTypeError exprt = exprt
                               | findinDb name db == Crt SimplyNull = Ok
                               | otherwise =  Er "Non void methods called "
@@ -364,7 +368,7 @@ typeExpr _ _ = Crt  SimplyNull
 --this methods looks in the database for a namse and returns its type
 -- used in determining a exprssion's type -> typeExpr
 findinDb:: String -> [DataBase] -> TypeError
-findinDb name ((DB  arg _ _):dbx) | name == stringArtgType arg = Crt $ typeArgtype arg
+findinDb name ((DB  arg _ _ _):dbx) | name == stringArtgType arg = Crt $ typeArgtype arg
                                   | otherwise = findinDb name dbx
 findinDb name ((DBF  arg  _ _):dbx) | name == stringArtgType arg = Crt$ typeArgtype arg
                                   | otherwise = findinDb name dbx
@@ -395,7 +399,7 @@ typeCheckCondition (Gq e1 e2)  db | typeExpr e1 db == typeExpr e2 db && not (typ
 findMethodParamsDB :: [DataBase] -> String ->(Bool,[Param])
 findMethodParamsDB ((DBF fname params _):db) name | stringArtgType fname == name = (True,params)
                                                 | otherwise = findMethodParamsDB db name
-findMethodParamsDB ((DB _ _ _):db) name = findMethodParamsDB db name
+findMethodParamsDB ((DB _ _ _ _):db) name = findMethodParamsDB db name
 findMethodParamsDB ((Err arg er):db) name |  stringArtgType arg == name = (False, [])
                                           | otherwise = findMethodParamsDB db name
 findMethodParamsDB [] _ = (False,[])
