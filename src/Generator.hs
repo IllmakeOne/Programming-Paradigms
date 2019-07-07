@@ -119,7 +119,7 @@ genFunc :: Commands -> Int -> [DataBase] -> Int -> Int -> Int -> [(String, Int)]
 genFunc (FunDecl (Arg ftype fname) params body) tCount smTable startOffs fOffs scope fnTable = (newOffs, fOffs, code, (fname, fOffs) : fnTable)
      where
        newOffs = startOffs + length code
-       before = [Debug ("************func prologue: " ++ fname),
+       before = [Debug ("func prologue: " ++ fname),
         Load (ImmValue (1 + 3 * length params)) regA, -- get right offset for AR
         Compute Sub regF regA regA, -- set it
         Load (ImmValue 1) regD,
@@ -135,10 +135,10 @@ genFunc (FunDecl (Arg ftype fname) params body) tCount smTable startOffs fOffs s
         ComputeI Sprockell.Add regC (length params + 1) regC,
         Store regF (IndAddr regC), -- go pass the params
         Compute Sprockell.Add regC reg0 regF,
-        Debug "Now the code"] -- reset back
+        Debug "func code:"] -- reset back
        code = before
         ++ genBlock (fromBlock body) tCount smTable (startOffs + length before) scope fnTable
-        ++ [Debug ("**fun epilogue: " ++ fname),
+        ++ [Debug ("func epilogue: " ++ fname),
           Load (IndAddr regF) regF, -- Go back to the old scope
           Load (ImmValue (3 * length params)) regA,
           Compute Sub regF regA regA,
@@ -262,8 +262,7 @@ gen (Fork (Funct fName params)) tCount smTable fnTable offset scope | tCount <= 
            ++ genFunParams params tCount smTable fnTable offset scope
            ++ [Load (ImmValue 5) regC]
            ++ storeForkParameters params tCount smTable scope
-           ++ [Debug "Forkie",
-           Load (ImmValue (length params)) regD,
+           ++ [Load (ImmValue (length params)) regD,
            WriteInstr regD (DirAddr 4),
            Load (ImmValue (fnToOff fnTable fName)) regD,
            WriteInstr regD (DirAddr 3), -- write address
@@ -483,18 +482,17 @@ genExpr NullExpr _ _ _ offset _ = (offset + 1, [Sprockell.Nop])
 genFunctionCall :: String -> [Expr] -> Int -> [DataBase] -> [(String, Int)] -> Int -> Int -> (Int, [Instruction])
 genFunctionCall fName params tCount smTable fnTable offset scope = (offset + length code, code)
   where
-    code = [Debug "funcall (precall):"]
+    code = [Debug "Func precall:"]
       ++ genFunParams params tCount smTable fnTable offset scope
       ++ [Compute  Sprockell.Add regF reg0 regC, -- set the AR in C
         ComputeI Sprockell.Add regC (length params + 1) regC] -- pointer to save to
       ++ storeParameters params tCount smTable scope
-      ++ [Debug "***RETURN ADDRESS:",
+      ++ [Debug "Func return address:",
         Load (ImmValue (offset + length code)) regD, -- return address
         Store regD (IndAddr regC),
         Compute Sprockell.Incr regC regC regC,
         Store regF (IndAddr regC), -- So store the return address
         Compute Sprockell.Add regC reg0 regF,  -- New scope of to the F
-        Debug "Here we goo:",
         Jump (Abs (fnToOff fnTable fName))] -- Let's jump to the actual function
 
 -- Generate the function parameters in reversed order
@@ -532,7 +530,6 @@ boolToInt False = 0
 -- -- Get the memory address for local or global variables
 memAddr :: Int -> Bool -> [DataBase] -> String -> Int -> (Int, Int, Bool) -> [Instruction]
 memAddr  tCount globDecl smTable name scope (x, y, isFnParam) | x >= 0 = [Compute Sprockell.Add regF reg0 regE] -- Local
-                                   ++ [Debug ("***xje:" ++ name ++ "! scope:" ++ show scope ++ ", x:" ++ show x ++ ", isFnParam: " ++ show isFnParam) ]
                                    ++ replicate (replicateAmount x scope isFnParam) (Load (IndAddr regE) regE) -- (x-scope) So get the address in regE
                                    ++ [ComputeI Sprockell.Add regE y regE]
                         | otherwise = [Load (ImmValue globalAddress) regA, -- mr world wide.
@@ -559,26 +556,32 @@ getOffset2 smTable name scope = (x, y, isFnParam) -- traceShow (scope, name, x, 
     (x', y, isFnParam) = getOffset smTable name scope
     x = x' - 2 + (scope-1)
 
---------- DEBUG REMOVE WHEN DONE!!
-codeGenTest = do
-  result <- parseFromFile parseBlock "../examples/banking.amv"
-  case result of
-    Left err -> print err
-    Right xs -> do
-      --print $ treeBuilder (fromBlock xs) 1 []
-      -- putStrLn (pretty code) -- print code
-      run $ replicate threadAmount code
-      --runWithDebugger (debuggerSimplePrint myShow) $ replicate threadAmount code
-      where
-        code = generation xs threadAmount
-        threadAmount = 3 -- <<<<<<<<<<<<<<<<<<<<<
+--------- DEBUG
+-- codeGenTest = do
+--   result <- parseFromFile parseBlock "../examples/banking.amv"
+--   case result of
+--     Left err -> print err
+--     Right xs -> do
+--       --print $ treeBuilder (fromBlock xs) 1 []
+--       -- putStrLn (pretty code) -- print code
+--       run $ replicate threadAmount code
+--       --runWithDebugger (debuggerSimplePrint myShow) $ replicate threadAmount code
+--       where
+--         code = generation xs threadAmount
+--         threadAmount = 3 -- <<<<<<<<<<<<<<<<<<<<<
+--
+-- showLocalMem :: DbgInput -> String
+-- showLocalMem ( _ , systemState ) = show $ localMem $ head $ sprStates systemState
+--
+-- pretty :: [Instruction] -> String
+-- pretty = pretty' 0
+--
+-- pretty' :: Int -> [Instruction] -> String
+-- pretty' _ [] = ""
+-- pretty' i (x:xs) = show i ++ ":    " ++ show x ++ "\n" ++ pretty' (i+1) xs
+
+
 
 pretty :: [Instruction] -> String
-pretty = pretty' 0
-
-pretty' :: Int -> [Instruction] -> String
-pretty' _ [] = ""
-pretty' i (x:xs) = show i ++ ":    " ++ show x ++ "\n" ++ pretty' (i+1) xs
-
-showLocalMem :: DbgInput -> String
-showLocalMem ( _ , systemState ) = show $ localMem $ head $ sprStates systemState
+pretty [] = ""
+pretty (x:xs) = show x ++ "\n" ++ pretty xs

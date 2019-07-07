@@ -1,0 +1,98 @@
+Branch 1 (Rel 6)
+TestAndSet (DirAddr 2)
+Receive 6
+Branch 6 (Rel 2)
+Jump (Rel (-3))
+Jump (Abs 57)
+ReadInstr (DirAddr 0)
+Receive 3
+Compute Equal 3 0 6
+Branch 6 (Rel 2)
+EndProg
+TestAndSet (DirAddr 2)
+Receive 6
+Branch 6 (Rel 2)
+Jump (Rel (-8))
+ComputeI Add 1 30 3
+TestAndSet (IndAddr 3)
+Receive 6
+Branch 6 (Rel 2)
+Jump (Rel (-3))
+ReadInstr (DirAddr 3)
+Receive 3
+Push 3
+ComputeI Add 7 1 4
+ReadInstr (DirAddr 4)
+Receive 5
+Load (ImmValue 5) 2
+Compute Equal 5 0 6
+Branch 6 (Rel 18)
+ReadInstr (IndAddr 2)
+Receive 3
+Store 3 (IndAddr 4)
+Compute Incr 2 2 2
+Compute Incr 4 4 4
+ReadInstr (IndAddr 2)
+Receive 3
+Store 3 (IndAddr 4)
+Compute Incr 2 2 2
+Compute Incr 4 4 4
+ReadInstr (IndAddr 2)
+Receive 3
+Store 3 (IndAddr 4)
+Compute Incr 2 2 2
+Compute Incr 4 4 4
+Compute Decr 5 5 5
+Jump (Rel (-18))
+Load (ImmValue 54) 5
+Store 5 (IndAddr 4)
+Compute Incr 4 4 4
+Store 7 (IndAddr 4)
+Compute Add 4 0 7
+Pop 2
+WriteInstr 0 (DirAddr 1)
+Jump (Ind 2)
+ComputeI Add 1 30 3
+WriteInstr 0 (IndAddr 3)
+Jump (Abs 9)
+Load (ImmValue 1) 6
+Push 6
+Load (ImmValue 33) 2
+TestAndSet (IndAddr 2)
+Receive 3
+Branch 3 (Rel 2)
+Jump (Rel (-4))
+Load (ImmValue 34) 6
+Pop 5
+WriteInstr 5 (IndAddr 6)
+WriteInstr 0 (IndAddr 2)
+Load (ImmValue 33) 2
+TestAndSet (IndAddr 2)
+Receive 3
+Branch 3 (Rel 2)
+Jump (Rel (-4))
+Load (ImmValue 34) 4
+ReadInstr (IndAddr 4)
+Receive 5
+Push 5
+WriteInstr 0 (IndAddr 2)
+Load (ImmValue 0) 6
+Push 6
+Pop 3
+Pop 2
+Compute Equal 2 3 2
+Push 2
+Pop 4
+BranchX 4 (Rel 6)
+Load (ImmValue 0) 6
+Push 6
+Pop 6
+WriteInstr 6 (DirAddr 65536)
+Jump (Rel 5)
+Load (ImmValue 1) 6
+Push 6
+Pop 6
+WriteInstr 6 (DirAddr 65536)
+Load (ImmValue 1) 2
+WriteInstr 2 (DirAddr 0)
+EndProg

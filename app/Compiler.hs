@@ -22,6 +22,7 @@ commandParser ["write", file, tCount] = writeSpril file (readMaybe tCount)
 commandParser _ = putStrLn $ "AMv compiler usage: c <file> <threadAmount> (compile and run file)\n"
                           ++ "                  |ast <file> (get the AST of file)\n"
                           ++ "                  |gen <file> <threadAmount> (print sprockell code of file)"
+                          ++ "                  |write <file> <threadAmount> (write sprockell code of file)"
 
 generateAndRun :: String -> Maybe Int -> IO ()
 generateAndRun file (Just tCount) = do
@@ -52,5 +53,5 @@ writeSpril file (Just tCount) = do
   result <- parseFromFile parseBlock file
   case result of
     Left err -> print err
-    Right xs -> writeFile (takeBaseName file ++ ".spril") $ pretty $ generation xs tCount
+    Right xs -> writeFile (takeDirectory file ++ "/" ++ takeBaseName file ++ ".spril") $ pretty $ generation xs tCount
 writeSpril _ _ = error "Please specify the amount of threads as an Int"

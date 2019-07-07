@@ -23,7 +23,7 @@ Haskell 8.0.2 (lts-9.21 on Stackage) as we used that version also during FP.
 * `stack exec -- amv gen <file> <amountOfThreads>`: print the Spril Code of the
   given file
 * `stack exec -- amv write <file> <amountOfThreads>`: write the Spril Code of the
-  given file.
+  given file, in the same directory as <file>.spril.
 
 ## Tests
 Currently the automated tests will run all the front-end tests.
