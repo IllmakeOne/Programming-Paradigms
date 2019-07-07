@@ -43,8 +43,9 @@ amv-lang/                 # → Root of the AMv Language
 │   ├── Parser.hs         # → File for the parser frontend
 │   ├── Structure.hs      # → The structure for the AST
 │   ├── TreeWalker.hs     # → File for the frontend of the compiler
+│   ├── TreeWalkerTests.hs # → File for the frontend otests
 |   test/                 # → The test directory
-│   ├── Tests .hs         # → Test the frontend
+│   ├── Tests .hs         # → Test the frontend with stack
 ├── LICENSE               # → The License file
 ├── package.yaml          # → File needed for Stack that generates cabal file
 ├── README.md             # → This README file
